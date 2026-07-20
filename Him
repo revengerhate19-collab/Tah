@@ -1,8 +1,6 @@
 -- ==========================================
 -- Aboubus Hub v1.3 (Wide + Short + Scrollable + Fixed Item Grabber)
--- with Prediction Lock-On (Players + NPCs)
--- + Correct M1 Assist (Uppercut / Downslam) + Auto Burst
--- + Emote Unlocker (replaces Extra Emote Slots toggle)
+-- ADDED: Kill All (Combat tab)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -231,7 +229,7 @@ contentFrame.Name = "Content"
 contentFrame.Size = UDim2.new(1, 0, 1, -HEADER_H)
 contentFrame.Position = UDim2.new(0, 0, 0, HEADER_H)
 contentFrame.BackgroundTransparency = 1
-contentFrame.ClipsDescendants = true
+contentFrame.ClipsDescendants = true          -- keeps scroll content inside window
 contentFrame.Parent = window
 
 -- ==========================================
@@ -253,16 +251,17 @@ local function makeStroke(parent, color, thickness, transparency)
     return s
 end
 
+-- Scrollable list: fills the tab frame, auto-sizes canvas
 local function makeScrollList(parent)
     local sf = Instance.new("ScrollingFrame")
-    sf.Size = UDim2.new(1, 0, 1, 0)
+    sf.Size = UDim2.new(1, 0, 1, 0)          -- full content frame
     sf.Position = UDim2.new(0, 0, 0, 0)
     sf.BackgroundTransparency = 1
     sf.BorderSizePixel = 0
-    sf.ScrollBarThickness = 4
+    sf.ScrollBarThickness = 4                  -- slightly thicker — easier to grab
     sf.ScrollBarImageColor3 = C.accent
     sf.ScrollingDirection = Enum.ScrollingDirection.Y
-    sf.CanvasSize = UDim2.new(0, 0, 0, 0)
+    sf.CanvasSize = UDim2.new(0, 0, 0, 0)    -- will grow with content
     sf.Parent = parent
 
     local layout = Instance.new("UIListLayout")
@@ -275,7 +274,7 @@ local function makeScrollList(parent)
     pad.PaddingTop = UDim.new(0, 5)
     pad.PaddingBottom = UDim.new(0, 6)
     pad.PaddingLeft = UDim.new(0, 4)
-    pad.PaddingRight = UDim.new(0, 6)
+    pad.PaddingRight = UDim.new(0, 6)         -- room for scrollbar
     pad.Parent = sf
 
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
@@ -661,6 +660,7 @@ local function switchTab(name)
     end
 end
 
+-- Tab buttons
 for _, name in ipairs(tabNames) do
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, 88, 0, 21)
@@ -693,56 +693,139 @@ for _, name in ipairs(tabNames) do
 end
 
 -- ==========================================
--- TARGETING: Players + NPCs
+-- HELPERS
 -- ==========================================
-local function getNearestTarget()
-    local myChar = LocalPlayer.Character
-    if not myChar then return nil end
-    local myHRP = myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return nil end
-    local nearest, minDist = nil, math.huge
+-- Get closest target (player or NPC) to the mouse cursor
+local function getClosestTargetToMouse()
+    local mousePos = UserInputService:GetMouseLocation()
+    local camera = workspace.CurrentCamera
+    local viewportSize = camera.ViewportSize
+    local bestDist = math.huge
+    local bestTarget = nil
 
-    -- 1) Players
+    -- Search players
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer then
-            local tChar = p.Character
-            if tChar then
-                local tHRP = tChar:FindFirstChild("HumanoidRootPart")
-                local tHum = tChar:FindFirstChildOfClass("Humanoid")
-                if tHRP and tHum and tHum.Health > 0 then
-                    local dist = (myHRP.Position - tHRP.Position).Magnitude
-                    if dist < minDist then
-                        minDist = dist
-                        nearest = {character = tChar, root = tHRP, humanoid = tHum}
+            local char = p.Character
+            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChildOfClass("Humanoid") and char:GetAttribute("Dead") ~= true then
+                local hrp = char.HumanoidRootPart
+                local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < bestDist then
+                        bestDist = dist
+                        bestTarget = char
                     end
                 end
             end
         end
     end
 
-    -- 2) NPCs (any Model in workspace with Humanoid + HumanoidRootPart)
-    for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= myChar then
-            -- skip if this is a player's character (already handled)
-            local isPlayer = false
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p.Character == obj then isPlayer = true; break end
-            end
-            if not isPlayer then
-                local tHRP = obj:FindFirstChild("HumanoidRootPart")
-                local tHum = obj:FindFirstChildOfClass("Humanoid")
-                if tHRP and tHum and tHum.Health > 0 then
-                    local dist = (myHRP.Position - tHRP.Position).Magnitude
-                    if dist < minDist then
-                        minDist = dist
-                        nearest = {character = obj, root = tHRP, humanoid = tHum}
+    -- Search NPCs (workspace.Characters)
+    local npcFolder = workspace:FindFirstChild("Characters")
+    if npcFolder then
+        for _, npc in ipairs(npcFolder:GetChildren()) do
+            if npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChildOfClass("Humanoid") and npc:GetAttribute("Dead") ~= true then
+                local hrp = npc.HumanoidRootPart
+                local screenPos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < bestDist then
+                        bestDist = dist
+                        bestTarget = npc
                     end
                 end
             end
         end
     end
 
-    return nearest
+    return bestTarget
+end
+
+-- ==========================================
+-- KILL ALL HELPERS (from TBO Tools)
+-- ==========================================
+local function resetChar()
+    workspace.FallenPartsDestroyHeight = -150
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hrp then
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+    end
+    if hum then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
+end
+
+local function isAlive(player)
+    if not player.Character then return false end
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    return hum ~= nil and hum.Health > 0
+end
+
+-- Break joints: remove Motor6D and Weld constraints
+local function breakJoints(char)
+    if not char then return end
+    for _, child in ipairs(char:GetDescendants()) do
+        if child:IsA("Motor6D") or child:IsA("Weld") or child:IsA("WeldConstraint") then
+            pcall(child.Destroy, child)
+        end
+    end
+end
+
+local function tpToSpam(hrp, tHRP, tHum)
+    local predicted = tHRP.Position + (tHum.MoveDirection * 0.8 * tHum.WalkSpeed)
+    local dest = CFrame.new(predicted - tHRP.CFrame.LookVector * 2, predicted)
+    local oldPos = hrp.Position
+    local char = LocalPlayer.Character
+
+    -- Break all joints to prevent interpolation
+    breakJoints(char)
+
+    -- Spam CFrame sets
+    for i = 1, 5 do
+        local offset = Vector3.new(
+            math.random(-1, 1) * 0.05,
+            math.random(-1, 1) * 0.05,
+            math.random(-1, 1) * 0.05
+        )
+        hrp.CFrame = dest * CFrame.new(offset)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        task.wait(0.01)
+    end
+
+    hrp.CFrame = dest
+
+    -- Velocity spoof
+    local disp = dest.Position - oldPos
+    if disp.Magnitude > 0.5 then
+        hrp.AssemblyLinearVelocity = disp * 80
+    end
+
+    workspace.FallenPartsDestroyHeight = -150
+end
+
+local function getSortedPlayers()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local alive, dead = {}, {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            if isAlive(p) then table.insert(alive, p)
+            else table.insert(dead, p) end
+        end
+    end
+    if hrp then
+        table.sort(alive, function(a, b)
+            local aH = a.Character and a.Character:FindFirstChild("HumanoidRootPart")
+            local bH = b.Character and b.Character:FindFirstChild("HumanoidRootPart")
+            if not aH then return false end
+            if not bH then return true end
+            return (hrp.Position - aH.Position).Magnitude < (hrp.Position - bH.Position).Magnitude
+        end)
+    end
+    return alive, dead
 end
 
 -- ==========================================
@@ -779,18 +862,12 @@ makeToggle(mainS, "Hide GUI", false, function(state)
     end
 end)
 
-makeSectionRow(mainS, "Prediction Lock")
-
--- ===== PREDICTION SETTINGS =====
-local PREDICTION_FACTOR = 0.22
-local LERP_ALPHA = 0.3
-local targetData = {}  -- stores lastPos and smoothed predicted pos per target root
+makeSectionRow(mainS, "Lock On")
 
 local lockOnActive = false
 local lockedTarget = nil
 local lockMethod = {}
 
--- Lock button (floating)
 local lockOnBtn = Instance.new("ImageButton")
 lockOnBtn.Name = "LockOnBtn"
 lockOnBtn.Size = UDim2.new(0, 70, 0, 70)
@@ -828,16 +905,22 @@ lockOnBtn.InputEnded:Connect(function(input)
     end
 end)
 
--- Core lock/unlock functions using prediction
 local function doLockOn()
-    local targetInfo = getNearestTarget()
-    if not targetInfo then return end
-    lockedTarget = targetInfo.character
+    lockedTarget = getClosestTargetToMouse()
+    if not lockedTarget then
+        warn("No target found near mouse")
+        return
+    end
     lockOnActive = true
     TweenService:Create(lockOnBtn, TweenInfo.new(0.15), {
         ImageColor3 = Color3.fromRGB(255, 60, 60)
     }):Play()
-    RunService:BindToRenderStep("LockOnCam", Enum.RenderPriority.Camera.Value + 1, function(delta)
+    RunService:BindToRenderStep("LockOnCam", Enum.RenderPriority.Camera.Value + 1, function()
+        if not lockOnActive then return end
+        -- Update target each frame to follow mouse
+        local newTarget = getClosestTargetToMouse()
+        if newTarget then lockedTarget = newTarget end
+
         if not lockedTarget or not lockedTarget.Parent or
            not lockedTarget:FindFirstChild("HumanoidRootPart") or
            lockedTarget:GetAttribute("Dead") then
@@ -846,8 +929,6 @@ local function doLockOn()
         end
         local myChar = LocalPlayer.Character
         if not myChar then return end
-
-        -- Camera mode
         if table.find(lockMethod, "Camera") then
             workspace.CurrentCamera.CameraType = Enum.CameraType.Track
             local camPos = workspace.CurrentCamera.CFrame.Position
@@ -858,44 +939,12 @@ local function doLockOn()
                 ) - workspace.CurrentCamera.CFrame.Position + camPos
             end
         end
-
-        -- Character mode with prediction
         if table.find(lockMethod, "Character") then
+            myChar.Humanoid.AutoRotate = false
             local hrp = myChar:FindFirstChild("HumanoidRootPart")
-            local hum = myChar:FindFirstChildOfClass("Humanoid")
             local tHRP = lockedTarget:FindFirstChild("HumanoidRootPart")
-            if hrp and hum and tHRP then
-                hum.AutoRotate = false
-
-                -- ---- PREDICTION CODE ----
-                local currentPos = tHRP.Position
-                local data = targetData[tHRP] or {}
-                local lastPos = data.lastPos
-                local predictedPos = currentPos
-
-                if lastPos and delta > 0.001 then
-                    local velocity = (currentPos - lastPos) / delta
-                    predictedPos = currentPos + velocity * PREDICTION_FACTOR
-                end
-
-                if data.smoothed then
-                    predictedPos = data.smoothed:Lerp(predictedPos, LERP_ALPHA)
-                end
-
-                data.lastPos = currentPos
-                data.smoothed = predictedPos
-                targetData[tHRP] = data
-                -- ---- END PREDICTION ----
-
-                -- Rotate horizontally to predicted position
-                local offset = Vector3.new(
-                    predictedPos.X - hrp.Position.X,
-                    0,
-                    predictedPos.Z - hrp.Position.Z
-                )
-                if offset.Magnitude > 0.001 then
-                    hrp.CFrame = CFrame.lookAt(hrp.Position, hrp.Position + offset.Unit)
-                end
+            if hrp and tHRP then
+                hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(tHRP.Position.X, hrp.Position.Y, tHRP.Position.Z))
             end
         end
     end)
@@ -904,12 +953,8 @@ end
 local function doUnlockOn()
     lockOnActive = false
     lockedTarget = nil
-    targetData = {}
     workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
-    if LocalPlayer.Character then
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum.AutoRotate = true end
-    end
+    if LocalPlayer.Character then LocalPlayer.Character.Humanoid.AutoRotate = true end
     RunService:UnbindFromRenderStep("LockOnCam")
     TweenService:Create(lockOnBtn, TweenInfo.new(0.15), {
         ImageColor3 = Color3.fromRGB(255, 255, 255)
@@ -920,18 +965,9 @@ lockOnBtn.MouseButton1Click:Connect(function()
     if lockOnActive then doUnlockOn() else doLockOn() end
 end)
 
--- UI toggles
-local lockToggleRow, setLockToggle, getLockToggle = makeToggle(mainS, "Prediction Lock", false, function(state)
+local lockToggleRow, setLockToggle, getLockToggle = makeToggle(mainS, "Lock On (closest to mouse)", false, function(state)
     lockOnBtn.Visible = state
     if state then doLockOn() else doUnlockOn() end
-end)
-
-makeSlider(mainS, "Prediction Factor", 1, 100, 22, function(v)
-    PREDICTION_FACTOR = v / 100
-end)
-
-makeSlider(mainS, "Prediction Smoothing", 0, 100, 30, function(v)
-    LERP_ALPHA = v / 100
 end)
 
 makeToggle(mainS, "Lock Mode: Camera", false, function(state)
@@ -973,7 +1009,7 @@ makeToggle(mainS, "Expand Hitbox", false, function(state)
 end)
 
 -- ==========================================
--- COMBAT TAB
+-- COMBAT TAB (FIXED SIDE DASH ASSIST + KILL ALL)
 -- ==========================================
 local combatS = scrolls["Combat"]
 
@@ -1014,7 +1050,10 @@ makeToggle(combatS, "Side Dash Assist", false, function(state)
                 local hrp = char:FindFirstChild("HumanoidRootPart")
                 local hum = char:FindFirstChildOfClass("Humanoid")
                 if not hrp or not hum then return end
+
+                -- Find nearest target (player or NPC)
                 local target, minDist = nil, math.huge
+                -- Check players
                 for _, p in ipairs(Players:GetPlayers()) do
                     if p ~= LocalPlayer and p.Character then
                         local tHRP = p.Character:FindFirstChild("HumanoidRootPart")
@@ -1025,231 +1064,143 @@ makeToggle(combatS, "Side Dash Assist", false, function(state)
                         end
                     end
                 end
-                if not target then return end
-                local animator = hum:FindFirstChildOfClass("Animator")
-                if not animator then return end
-                local dashDir = nil
-                for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
-                    if track.Animation then
-                        local id = track.Animation.AnimationId
-                        if id:find("Dash") or track.Name:lower():find("dash") then
-                            if track.Name:lower():find("right") then dashDir = "Right"
-                            elseif track.Name:lower():find("left") then dashDir = "Left" end
+                -- Check NPCs
+                local npcFolder = workspace:FindFirstChild("Characters")
+                if npcFolder then
+                    for _, npc in ipairs(npcFolder:GetChildren()) do
+                        local tHRP = npc:FindFirstChild("HumanoidRootPart")
+                        local tHum = npc:FindFirstChildOfClass("Humanoid")
+                        if tHRP and tHum and tHum.Health > 0 then
+                            local dist = (tHRP.Position - hrp.Position).Magnitude
+                            if dist < minDist then minDist = dist; target = tHRP end
                         end
                     end
                 end
-                if dashDir and minDist <= 20 then
-                    local angle = dashDir == "Right" and 75 or -75
-                    local targetDir = CFrame.lookAt(hrp.Position, Vector3.new(target.Position.X, hrp.Position.Y, target.Position.Z))
-                    hrp.CFrame = hrp.CFrame:Lerp(targetDir * CFrame.Angles(0, math.rad(angle), 0), 0.2)
+                if not target or minDist > 25 then return end
+
+                -- Check if dashing via velocity
+                local vel = hrp.Velocity
+                local isDashing = vel.Magnitude > 30 and hum.MoveDirection.Magnitude < 0.5
+                if not isDashing then return end
+
+                -- Determine dash direction
+                local dashDir = nil
+                local rightDot = vel.Unit:Dot(hrp.CFrame.RightVector)
+                if math.abs(rightDot) > 0.7 then
+                    dashDir = rightDot > 0 and "Right" or "Left"
+                else
+                    return -- not a side dash
+                end
+
+                if dashDir and minDist <= 25 then
+                    -- Position behind target
+                    local targetCF = target.CFrame
+                    local behindPos = targetCF.Position - targetCF.LookVector * 3.5 + Vector3.new(0, 0.5, 0)
+                    local lookTarget = targetCF.Position
+                    hrp.CFrame = CFrame.new(behindPos, lookTarget)
+
+                    -- Fire M1
+                    task.wait(0.05)
+                    local moveset = char:FindFirstChild("Moveset")
+                    if moveset then
+                        local m1 = moveset:FindFirstChild("M1")
+                        if m1 then
+                            local svc = RS.Knit.Knit.Services[char:GetAttribute("Moveset") .. "Service"]
+                            if svc and svc.RE and svc.RE.Activated then
+                                svc.RE.Activated:FireServer(m1)
+                            end
+                        end
+                    end
                 end
             end)
         end)
     elseif not state and dashConn then
-        dashConn:Disconnect(); dashConn = nil
+        dashConn:Disconnect()
+        dashConn = nil
     end
 end)
 
 -- ==========================================
--- AUTO TAB (Correct M1 Assist + Auto Burst)
+-- KILL ALL (from TBO Tools)
+-- ==========================================
+makeSectionRow(combatS, "Kill All")
+
+local killAllOn = false
+local killAllConn = nil
+local killAllCached = {}
+local killAllIndex = 1
+local killAllRefreshTimer = 0
+
+makeToggle(combatS, "Kill All (TP Loop)", false, function(state)
+    killAllOn = state
+    if killAllOn then
+        killAllCached = {}
+        killAllIndex = 1
+        killAllRefreshTimer = 0
+        setStatus("Kill All ON", Color3.fromRGB(255, 80, 80))
+        if killAllConn then killAllConn:Disconnect(); killAllConn = nil end
+        killAllConn = RunService.Heartbeat:Connect(function(dt)
+            if not killAllOn then return end
+            local char = LocalPlayer.Character
+            if not char then return end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if not hrp then return end
+
+            killAllRefreshTimer = killAllRefreshTimer + dt
+            if killAllRefreshTimer >= 0.5 or #killAllCached == 0 then
+                killAllRefreshTimer = 0
+                local alive, dead = getSortedPlayers()
+                killAllCached = #alive > 0 and alive or dead
+                if killAllIndex > #killAllCached then killAllIndex = 1 end
+            end
+
+            if #killAllCached == 0 then return end
+            if killAllIndex > #killAllCached then killAllIndex = 1 end
+
+            local target = killAllCached[killAllIndex]
+            local tChar = target and target.Character
+            if tChar then
+                local tHRP = tChar:FindFirstChild("HumanoidRootPart")
+                local tHum = tChar:FindFirstChildOfClass("Humanoid")
+                if tHRP and tHum then
+                    tpToSpam(hrp, tHRP, tHum)
+                end
+            end
+
+            killAllIndex = killAllIndex + 1
+        end)
+    else
+        if killAllConn then killAllConn:Disconnect(); killAllConn = nil end
+        workspace.FallenPartsDestroyHeight = -150
+        resetChar()
+        setStatus("Kill All OFF", Color3.fromRGB(150, 150, 150))
+    end
+end)
+
+-- ==========================================
+-- AUTO TAB (AUTO BLACKFLASH REMOVED)
 -- ==========================================
 local autoS = scrolls["Auto"]
 
--- ---- M1 ASSIST (UpperCut / DownSlam) ----
-makeSectionRow(autoS, "M1 Assist")
+makeSectionRow(autoS, "Auto Combat")
 
-local M1Method = "Hop"  -- "Hop" = UpperCut, "Side" = DownSlam
-local autoM1Active = false
-local autoM1RenderStep = nil
-local autoM1Connections = {}
-local comboCount = 0
-local lastHitTime = 0
-
--- The actual M1 function (fires remote + applies velocity)
-local function doM1()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not hum then return end
-
-    -- Fire M1 remote (same as normal click)
-    local movesetName = LocalPlayer:GetAttribute("Moveset")
-    if movesetName then
-        local service = RS.Knit.Knit.Services[movesetName .. "Service"]
-        if service and service.RE and service.RE.Activated then
-            pcall(function()
-                service.RE.Activated:FireServer(false)
-            end)
-        end
-    end
-
-    -- Apply velocity based on selected method
-    local bv = Instance.new("BodyVelocity")
-    bv.MaxForce = Vector3.new(100000, 100000, 100000)
-    if M1Method == "Hop" then
-        bv.Velocity = Vector3.new(0, 25, 0)    -- upward (uppercut)
-    elseif M1Method == "Side" then
-        local right = hrp.CFrame.RightVector * 20
-        bv.Velocity = Vector3.new(right.X, 0, right.Z)  -- sideways (downslam)
-    end
-    bv.Parent = hrp
-    task.delay(0.2, function()
-        if bv then bv:Destroy() end
-    end)
-end
-
-local function startM1Assist()
-    if autoM1Active then return end
-    autoM1Active = true
-    comboCount = 0
-    lastHitTime = 0
-
-    -- Render step: spam M1
-    autoM1RenderStep = RunService:BindToRenderStep("M1-Farm", 0, function()
-        if not autoM1Active then return end
-        doM1()
-    end)
-
-    -- Listen to "Swing2" to reset animations and maintain combo
-    local function onSwing2(...)
-        local args = {...}
-        if args[1] == "Swing2" and args[2] == LocalPlayer.Character and args[3] == 3 then
-            local now = tick()
-            if now - lastHitTime > 2 then
-                comboCount = 0
-            end
-            lastHitTime = now
-            comboCount = comboCount + 1
-            if comboCount >= 4 then
-                comboCount = 0
-                -- Reset character to clear animations
-                local char = LocalPlayer.Character
-                if char then
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        hum:Move(Vector3.new(0,0,0), false)
-                    end
-                end
-            end
-        end
-    end
-
-    -- Connect to all RE.Effects for Swing2
-    for _, service in ipairs(RS.Knit.Knit.Services:GetChildren()) do
-        if service:FindFirstChild("RE") and service.RE:FindFirstChild("Effects") then
-            local conn = service.RE.Effects.OnClientEvent:Connect(onSwing2)
-            table.insert(autoM1Connections, conn)
-        end
-    end
-
-    print("✅ Auto M1 started (method: " .. M1Method .. ")")
-end
-
-local function stopM1Assist()
-    autoM1Active = false
-    if autoM1RenderStep then
-        RunService:UnbindFromRenderStep("M1-Farm")
-        autoM1RenderStep = nil
-    end
-    for _, conn in ipairs(autoM1Connections) do
-        pcall(conn.Disconnect, conn)
-    end
-    table.clear(autoM1Connections)
-    comboCount = 0
-    print("✅ Auto M1 stopped")
-end
-
--- Dropdown with display names matching the screenshot
-local m1MethodItems = {"UpperCut", "DownSlam"}
-local m1Dropdown, updateM1Dropdown, getM1Method = makeDropdown(autoS, "M1 Method", m1MethodItems, "UpperCut", function(value)
-    M1Method = (value == "UpperCut") and "Hop" or "Side"
-end)
-
--- Toggle for M1 Assist
-makeToggle(autoS, "M1 Assist", false, function(state)
-    if state then
-        startM1Assist()
-    else
-        stopM1Assist()
-    end
-end)
-
--- ---- AUTO BURST ----
-makeSectionRow(autoS, "Auto Burst")
-
-local autoBurstActive = false
-local autoBurstRenderStep = nil
-
-local function startAutoBurst()
-    if autoBurstActive then return end
-    autoBurstActive = true
-    autoBurstRenderStep = RunService:BindToRenderStep("Auto-Burst", 0, function()
-        if not autoBurstActive then return end
-        local char = LocalPlayer.Character
-        if not char then return end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum then return end
-        local burstFound = false
-        for _, child in ipairs(hrp:GetChildren()) do
-            if child.Name == "BurstIcon" or child.Name == "Evade" then
-                burstFound = true
-                break
-            end
-        end
-        if not burstFound then return end
-        local moveDir = hum.MoveDirection
-        if moveDir.Magnitude > 0 then
-            local dir = "Left"
-            if math.abs(moveDir.X) > math.abs(moveDir.Z) then
-                dir = moveDir.X > 0 and "Right" or "Left"
-            else
-                dir = moveDir.Z < 0 and "Back" or "Left"
-            end
-            local movementService = RS.Knit.Knit.Services.MovementService
-            if movementService and movementService.RE and movementService.RE.Dash then
-                pcall(function()
-                    movementService.RE.Dash:FireServer(dir, true)
-                end)
-            end
-        end
-    end)
-end
-
-local function stopAutoBurst()
-    autoBurstActive = false
-    if autoBurstRenderStep then
-        RunService:UnbindFromRenderStep("Auto-Burst")
-        autoBurstRenderStep = nil
-    end
-end
-
-makeToggle(autoS, "Auto Burst", false, function(state)
-    if state then startAutoBurst() else stopAutoBurst() end
-end)
+-- Auto Yuji Blackflash removed per user request
 
 -- ==========================================
--- EXTRA TAB (FIXED ITEM GRABBER + EMOTE UNLOCKER)
+-- EXTRA TAB (FIXED ITEM GRABBER)
 -- ==========================================
 local extraS = scrolls["Extra"]
 
 makeSectionRow(extraS, "Emotes")
 
--- Replaced the toggle with a button that unlocks extra emote slots
-makeButton(extraS, "Emote Unlocker", function()
-    local gp = game:GetService("Players").LocalPlayer:WaitForChild("Gamepasses")
-    gp:SetAttribute("742180133", true)
-    gp:SetAttribute("1151174294", true)
-
-    -- Also make the extra emote slots visible
+makeToggle(extraS, "Extra Emote Slots", false, function(state)
     pcall(function()
         local Menus = LocalPlayer.PlayerGui:WaitForChild("Menus")
         for _, obj in ipairs(Menus:GetDescendants()) do
             if obj:IsA("Frame") or obj:IsA("ImageButton") or obj:IsA("TextButton") then
                 local n = tonumber(obj.Name)
-                if n and n >= 5 and n <= 9 then obj.Visible = true end
-                if obj.Name == "Switch" then obj.Visible = true end
+                if n and n >= 5 and n <= 9 then obj.Visible = state end
+                if obj.Name == "Switch" then obj.Visible = state end
             end
         end
         local ok, Equipped = pcall(function()
@@ -1258,19 +1209,12 @@ makeButton(extraS, "Emote Unlocker", function()
         if ok and Equipped then
             for _, v in ipairs(Equipped:GetChildren()) do
                 local n = tonumber(v.Name)
-                if n and n >= 5 then v.Visible = true end
+                if n and n >= 5 then v.Visible = state end
             end
             local sw = Equipped:FindFirstChild("Switch")
-            if sw then sw.Visible = true end
+            if sw then sw.Visible = state end
         end
     end)
-
-    -- Show a confirmation notification
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Emote Unlocker",
-        Text = "Extra emote slots unlocked!",
-        Duration = 3
-    })
 end)
 
 makeSectionRow(extraS, "Item Grabber")
@@ -1286,6 +1230,7 @@ local KNOWN_ITEMS = {
 local MIN_Y = -50
 local MAX_Y = 1000
 
+-- FIXED: Scans containers (Models or Parts) that have a ProximityPrompt
 local function scanItems()
     local found = {}
     local playerChar = LocalPlayer.Character
@@ -1323,6 +1268,7 @@ local function scanItems()
     return found
 end
 
+-- FIXED: Find the container, prompt, and target part for an item name
 local function findItem(itemName)
     local playerChar = LocalPlayer.Character
     for _, obj in ipairs(workspace:GetDescendants()) do
@@ -1504,4 +1450,4 @@ makeCorner(credLbl, 6)
 -- ==========================================
 switchTab("Main")
 
-print("✅ Aboubus Hub v1.3 with Emote Unlocker, Prediction Lock, M1 Assist, and Auto Burst loaded")
+print("✅ Aboubus Hub v1.3 loaded (Kill All added)")
