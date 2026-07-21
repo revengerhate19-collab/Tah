@@ -1,9 +1,9 @@
 -- ==========================================
--- Aboubus Hub v1.3 (Wide + Short + Scrollable + Fixed Item Grabber)
+-- ｢𝙆𝙕𝙈」 Hub v1.3 (Wide + Short + Scrollable + Fixed Item Grabber)
 -- with Prediction Lock-On (Players + NPCs)
 -- + Correct M1 Assist (Uppercut / Downslam) + Auto Burst
 -- + Emote Unlocker (replaces Extra Emote Slots toggle)
--- + INTEGRATED TBO TOOLS: TP Bypass, TP Selected, TP All Loop, Kill All
+-- + Integrated Teleport Tools (Bypass, Selected, All Loop, Kill All)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -36,7 +36,7 @@ local C = {
 -- SCREEN GUI
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "AboubuHub"
+screenGui.Name = "KZMHub"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = LocalPlayer.PlayerGui
@@ -131,7 +131,7 @@ local hubTitle = Instance.new("TextLabel")
 hubTitle.Size = UDim2.new(1, -80, 1, 0)
 hubTitle.Position = UDim2.new(0, 12, 0, 0)
 hubTitle.BackgroundTransparency = 1
-hubTitle.Text = "Aboubus Hub"
+hubTitle.Text = "｢𝙆𝙕𝙈」"
 hubTitle.TextColor3 = C.white
 hubTitle.Font = Enum.Font.GothamBold
 hubTitle.TextSize = 14
@@ -647,7 +647,7 @@ end
 -- ==========================================
 local tabs = {}
 local tabFrames = {}
-local tabNames = {"Main", "Combat", "Auto", "Extra", "Configs"}
+local tabNames = {"Main", "Combat", "Auto", "Teleport", "Extra", "Configs"}
 
 local function switchTab(name)
     for _, tData in pairs(tabs) do
@@ -774,7 +774,7 @@ end)
 
 makeToggle(mainS, "Hide GUI", false, function(state)
     for _, gui in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-        if gui.Name ~= "AboubuHub" then
+        if gui.Name ~= "KZMHub" then
             pcall(function() gui.Enabled = not state end)
         end
     end
@@ -974,7 +974,7 @@ makeToggle(mainS, "Expand Hitbox", false, function(state)
 end)
 
 -- ==========================================
--- COMBAT TAB (with integrated TBO Tools)
+-- COMBAT TAB
 -- ==========================================
 local combatS = scrolls["Combat"]
 
@@ -1052,11 +1052,11 @@ makeToggle(combatS, "Side Dash Assist", false, function(state)
 end)
 
 -- ==========================================
--- INTEGRATED TBO TOOLS - Teleport Features
+-- TELEPORT TAB (moved from Combat, reworked TP All Loop)
 -- ==========================================
-makeSectionRow(combatS, "Teleport (TBO)")
+local teleportS = scrolls["Teleport"]
 
--- Shared TP functions from TBO Tools
+-- Shared TP functions (originally from TBO, but now renamed)
 local function resetChar()
     workspace.FallenPartsDestroyHeight = -150
     local char = LocalPlayer.Character
@@ -1160,30 +1160,8 @@ local function tpToSpam(hrp, tHRP, tHum)
     workspace.FallenPartsDestroyHeight = -150
 end
 
-local function getSortedPlayers()
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    local alive, dead = {}, {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            if isAlive(p) then table.insert(alive, p)
-            else table.insert(dead, p) end
-        end
-    end
-    if hrp then
-        table.sort(alive, function(a, b)
-            local aH = a.Character and a.Character:FindFirstChild("HumanoidRootPart")
-            local bH = b.Character and b.Character:FindFirstChild("HumanoidRootPart")
-            if not aH then return false end
-            if not bH then return true end
-            return (hrp.Position - aH.Position).Magnitude < (hrp.Position - bH.Position).Magnitude
-        end)
-    end
-    return alive, dead
-end
-
--- UI Toggles for TP features
-makeToggle(combatS, "TP Bypass", false, function(state)
+-- TP Bypass toggle
+makeToggle(teleportS, "TP Bypass", false, function(state)
     tpBypassOn = state
     if state then
         antistuff()
@@ -1192,7 +1170,7 @@ makeToggle(combatS, "TP Bypass", false, function(state)
     end
 end)
 
--- TP Selected
+-- TP Selected (unchanged)
 local tpSelOn = false
 local tpSelConn = nil
 local selectedPlayer = nil
@@ -1211,14 +1189,13 @@ local playerNames = {}
 for _, p in ipairs(Players:GetPlayers()) do
     if p ~= LocalPlayer then table.insert(playerNames, p.Name) end
 end
-local tpSelDropdown, updateTpSelList, getTpSelPlayer = makeDropdown(combatS, "TP Selected Target", playerNames, playerNames[1], function(value)
+local tpSelDropdown, updateTpSelList, getTpSelPlayer = makeDropdown(teleportS, "TP Selected Target", playerNames, playerNames[1], function(value)
     selectedPlayer = Players:FindFirstChild(value)
 end)
 
-makeToggle(combatS, "TP Selected", false, function(state)
+makeToggle(teleportS, "TP Selected", false, function(state)
     if state then
         if not selectedPlayer then
-            -- default to first in list
             local first = Players:GetPlayers()[1]
             if first and first ~= LocalPlayer then selectedPlayer = first end
         end
@@ -1232,7 +1209,7 @@ makeToggle(combatS, "TP Selected", false, function(state)
         end
         tpSelOn = true
         if not tpBypassOn then antistuff() end
-        setStatus("TP -> " .. selectedPlayer.Name, Color3.fromRGB(255, 180, 80))
+        setTeleportStatus("TP -> " .. selectedPlayer.Name, Color3.fromRGB(255, 180, 80))
         if tpSelConn then tpSelConn:Disconnect(); tpSelConn = nil end
         tpSelConn = RunService.Heartbeat:Connect(function()
             if not tpSelOn then return end
@@ -1252,62 +1229,81 @@ makeToggle(combatS, "TP Selected", false, function(state)
     end
 end)
 
--- TP All Loop
+-- TP All Loop (reworked: random target, stick until death)
 local tpLoopOn = false
 local tpLoopConn = nil
+local currentLoopTarget = nil
 
-makeToggle(combatS, "TP All Loop", false, function(state)
+makeToggle(teleportS, "TP All Loop", false, function(state)
     tpLoopOn = state
     if state then
         if not tpBypassOn then antistuff() end
         if tpLoopConn then tpLoopConn:Disconnect(); tpLoopConn = nil end
+        currentLoopTarget = nil
 
-        local index = 1
-        local cached = {}
-        local refreshTimer = 0
-
-        tpLoopConn = RunService.Heartbeat:Connect(function(dt)
+        tpLoopConn = RunService.Heartbeat:Connect(function()
             if not tpLoopOn then return end
             local char = LocalPlayer.Character
             if not char then return end
             local hrp = char:FindFirstChild("HumanoidRootPart")
             if not hrp then return end
 
-            refreshTimer = refreshTimer + dt
-            if refreshTimer >= 0.5 or #cached == 0 then
-                refreshTimer = 0
-                local alive, dead = getSortedPlayers()
-                cached = #alive > 0 and alive or dead
-                if index > #cached then index = 1 end
+            -- If we have a current target, check if still alive and valid
+            if currentLoopTarget then
+                local tChar = currentLoopTarget.Character
+                if tChar then
+                    local tHRP = tChar:FindFirstChild("HumanoidRootPart")
+                    local tHum = tChar:FindFirstChildOfClass("Humanoid")
+                    if tHRP and tHum and tHum.Health > 0 then
+                        -- Still alive, teleport to it
+                        tpToSpam(hrp, tHRP, tHum)
+                        setTeleportStatus("🔁 " .. currentLoopTarget.Name .. " (alive)", Color3.fromRGB(255, 100, 100))
+                        return
+                    end
+                end
+                -- Target dead or invalid, clear it
+                currentLoopTarget = nil
             end
 
-            if #cached == 0 then return end
-            if index > #cached then index = 1 end
-
-            local target = cached[index]
-            local tChar = target and target.Character
-            if tChar then
-                local tHRP = tChar:FindFirstChild("HumanoidRootPart")
-                local tHum = tChar:FindFirstChildOfClass("Humanoid")
-                if tHRP and tHum then
-                    tpToSpam(hrp, tHRP, tHum)
-                    local tag = isAlive(target) and "[A]" or "[D]"
-                    setStatus("🔁 " .. tag .. " " .. target.Name, Color3.fromRGB(255, 100, 100))
+            -- No current target: pick a random alive player
+            local alivePlayers = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and isAlive(p) then
+                    table.insert(alivePlayers, p)
                 end
             end
-
-            index = index + 1
+            if #alivePlayers > 0 then
+                currentLoopTarget = alivePlayers[math.random(1, #alivePlayers)]
+                setTeleportStatus("🔁 Switching to " .. currentLoopTarget.Name, Color3.fromRGB(255, 200, 100))
+                -- Teleport immediately (next heartbeat will handle it)
+            else
+                -- No alive players, fallback to dead players (pick random)
+                local deadPlayers = {}
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and not isAlive(p) then
+                        table.insert(deadPlayers, p)
+                    end
+                end
+                if #deadPlayers > 0 then
+                    currentLoopTarget = deadPlayers[math.random(1, #deadPlayers)]
+                    setTeleportStatus("🔁 " .. currentLoopTarget.Name .. " (dead)", Color3.fromRGB(255, 150, 50))
+                else
+                    setTeleportStatus("🔁 No targets available", Color3.fromRGB(200, 200, 200))
+                end
+            end
         end)
     else
         if tpLoopConn then tpLoopConn:Disconnect(); tpLoopConn = nil end
         if not tpBypassOn then unantistuff() end
         workspace.FallenPartsDestroyHeight = -150
         resetChar()
+        currentLoopTarget = nil
+        setTeleportStatus("TP Loop OFF", Color3.fromRGB(150, 150, 150))
     end
 end)
 
--- Kill All button: teleport to every player once
-makeButton(combatS, "Kill All", function()
+-- Kill All button (unchanged)
+makeButton(teleportS, "Kill All", function()
     local char = LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -1326,12 +1322,12 @@ makeButton(combatS, "Kill All", function()
             end
         end
     end
-    setStatus("Kill All executed", Color3.fromRGB(255, 200, 100))
+    setTeleportStatus("Kill All executed", Color3.fromRGB(255, 200, 100))
 end)
 
--- Utility status function
-local function setStatus(msg, color)
-    local statusRow = combatS:FindFirstChild("StatusRow")
+-- Status label for Teleport tab
+local function setTeleportStatus(msg, color)
+    local statusRow = teleportS:FindFirstChild("StatusRow")
     if statusRow then
         local lbl = statusRow:FindFirstChild("StatusLabel")
         if lbl then
@@ -1341,25 +1337,24 @@ local function setStatus(msg, color)
     end
 end
 
--- Add a status label at the bottom of Combat tab
-local statusRow = Instance.new("Frame")
-statusRow.Name = "StatusRow"
-statusRow.Size = UDim2.new(1, -4, 0, 20)
-statusRow.BackgroundColor3 = C.row
-statusRow.BorderSizePixel = 0
-statusRow.Parent = combatS
-makeCorner(statusRow, 5)
-makeStroke(statusRow, C.stroke, 1, 0.5)
-local statusLbl = Instance.new("TextLabel")
-statusLbl.Name = "StatusLabel"
-statusLbl.Size = UDim2.new(1, 0, 1, 0)
-statusLbl.BackgroundTransparency = 1
-statusLbl.Text = "Ready"
-statusLbl.TextColor3 = C.textDim
-statusLbl.Font = Enum.Font.Gotham
-statusLbl.TextSize = 10
-statusLbl.TextXAlignment = Enum.TextXAlignment.Center
-statusLbl.Parent = statusRow
+local statusRowTp = Instance.new("Frame")
+statusRowTp.Name = "StatusRow"
+statusRowTp.Size = UDim2.new(1, -4, 0, 20)
+statusRowTp.BackgroundColor3 = C.row
+statusRowTp.BorderSizePixel = 0
+statusRowTp.Parent = teleportS
+makeCorner(statusRowTp, 5)
+makeStroke(statusRowTp, C.stroke, 1, 0.5)
+local statusLblTp = Instance.new("TextLabel")
+statusLblTp.Name = "StatusLabel"
+statusLblTp.Size = UDim2.new(1, 0, 1, 0)
+statusLblTp.BackgroundTransparency = 1
+statusLblTp.Text = "Ready"
+statusLblTp.TextColor3 = C.textDim
+statusLblTp.Font = Enum.Font.Gotham
+statusLblTp.TextSize = 10
+statusLblTp.TextXAlignment = Enum.TextXAlignment.Center
+statusLblTp.Parent = statusRowTp
 
 -- ==========================================
 -- AUTO TAB (Correct M1 Assist + Auto Burst)
@@ -1803,7 +1798,7 @@ local credLbl = Instance.new("TextLabel")
 credLbl.Size = UDim2.new(1, -4, 0, 36)
 credLbl.BackgroundColor3 = C.row
 credLbl.BorderSizePixel = 0
-credLbl.Text = "Aboubus Hub • Made for JJS\nBuilt by Aboubus"
+credLbl.Text = "｢𝙆𝙕𝙈」 • Made for JJS\nBuilt by KZM"
 credLbl.TextColor3 = C.textDim
 credLbl.Font = Enum.Font.Gotham
 credLbl.TextSize = 10
@@ -1821,11 +1816,10 @@ LocalPlayer.CharacterAdded:Connect(function()
     if tpSelConn then tpSelConn:Disconnect(); tpSelConn = nil end
     tpLoopOn = false
     if tpLoopConn then tpLoopConn:Disconnect(); tpLoopConn = nil end
+    currentLoopTarget = nil
     workspace.FallenPartsDestroyHeight = -150
     selectedPlayer = nil
-    -- Update UI toggles via the setState functions (we need to capture them)
-    -- Since we don't have direct refs, we can just let them be; user can toggle off/on again
-    setStatus("Respawned", Color3.fromRGB(100, 200, 100))
+    setTeleportStatus("Respawned", Color3.fromRGB(100, 200, 100))
 end)
 
 -- ==========================================
@@ -1833,4 +1827,4 @@ end)
 -- ==========================================
 switchTab("Main")
 
-print("✅ Aboubus Hub v1.3 with integrated TBO Tools (TP Bypass, TP Selected, TP All Loop, Kill All) loaded")
+print("✅ ｢𝙆𝙕𝙈」 Hub v1.3 with Teleport Tools (Bypass, Selected, All Loop, Kill All) loaded")
