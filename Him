@@ -1,5 +1,5 @@
 -- ==========================================
--- ｢𝙆𝙕𝙈」 Hub v1.3 (Wide + Short + Scrollable + Fixed Item Grabber)
+-- ｢KZM」 v1.3 (Wide + Short + Scrollable + Fixed Item Grabber)
 -- with Prediction Lock-On (Players + NPCs)
 -- + Correct M1 Assist (Uppercut / Downslam) + Auto Burst
 -- + Emote Unlocker (replaces Extra Emote Slots toggle)
@@ -36,7 +36,7 @@ local C = {
 -- SCREEN GUI
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "KZMHub"
+screenGui.Name = "KZM"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = LocalPlayer.PlayerGui
@@ -131,7 +131,7 @@ local hubTitle = Instance.new("TextLabel")
 hubTitle.Size = UDim2.new(1, -80, 1, 0)
 hubTitle.Position = UDim2.new(0, 12, 0, 0)
 hubTitle.BackgroundTransparency = 1
-hubTitle.Text = "｢𝙆𝙕𝙈」"
+hubTitle.Text = "｢KZM」"
 hubTitle.TextColor3 = C.white
 hubTitle.Font = Enum.Font.GothamBold
 hubTitle.TextSize = 14
@@ -774,7 +774,7 @@ end)
 
 makeToggle(mainS, "Hide GUI", false, function(state)
     for _, gui in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
-        if gui.Name ~= "KZMHub" then
+        if gui.Name ~= "KZM" then
             pcall(function() gui.Enabled = not state end)
         end
     end
@@ -1798,7 +1798,7 @@ local credLbl = Instance.new("TextLabel")
 credLbl.Size = UDim2.new(1, -4, 0, 36)
 credLbl.BackgroundColor3 = C.row
 credLbl.BorderSizePixel = 0
-credLbl.Text = "｢𝙆𝙕𝙈」 • Made for JJS\nBuilt by KZM"
+credLbl.Text = "｢KZM」 • Made for JJS\nBuilt by KZM"
 credLbl.TextColor3 = C.textDim
 credLbl.Font = Enum.Font.Gotham
 credLbl.TextSize = 10
@@ -1827,4 +1827,4 @@ end)
 -- ==========================================
 switchTab("Main")
 
-print("✅ ｢𝙆𝙕𝙈」 Hub v1.3 with Teleport Tools (Bypass, Selected, All Loop, Kill All) loaded")
+print("✅ ｢KZM」 v1.3 with Teleport Tools (Bypass, Selected, All Loop, Kill All) loaded")
