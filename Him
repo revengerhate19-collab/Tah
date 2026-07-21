@@ -3,7 +3,7 @@
 -- with Prediction Lock-On (Players + NPCs)
 -- + Correct M1 Assist (Uppercut / Downslam) + Auto Burst
 -- + Emote Unlocker (replaces Extra Emote Slots toggle)
--- + Integrated Teleport Tools (Bypass, Selected, All Loop, Kill All)
+-- + Integrated Teleport Tools (Bypass, Selected, All Loop)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -198,6 +198,7 @@ end)
 
 -- ==========================================
 -- TAB BAR (height 28, sits below title)
+-- TAB WIDTH REDUCED TO 70 TO FIT ALL 6 TABS
 -- ==========================================
 local TAB_H = 28
 
@@ -643,7 +644,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
 end
 
 -- ==========================================
--- TABS
+-- TABS (6 tabs, width 70 each to fit)
 -- ==========================================
 local tabs = {}
 local tabFrames = {}
@@ -664,7 +665,7 @@ end
 
 for _, name in ipairs(tabNames) do
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 88, 0, 21)
+    btn.Size = UDim2.new(0, 70, 0, 21)  -- reduced width to fit all
     btn.BackgroundColor3 = C.tabIdle
     btn.Text = name
     btn.TextColor3 = C.textDim
@@ -724,7 +725,6 @@ local function getNearestTarget()
     -- 2) NPCs (any Model in workspace with Humanoid + HumanoidRootPart)
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("Model") and obj ~= myChar then
-            -- skip if this is a player's character (already handled)
             local isPlayer = false
             for _, p in ipairs(Players:GetPlayers()) do
                 if p.Character == obj then isPlayer = true; break end
@@ -785,7 +785,7 @@ makeSectionRow(mainS, "Prediction Lock")
 -- ===== PREDICTION SETTINGS =====
 local PREDICTION_FACTOR = 0.22
 local LERP_ALPHA = 0.3
-local targetData = {}  -- stores lastPos and smoothed predicted pos per target root
+local targetData = {}
 
 local lockOnActive = false
 local lockedTarget = nil
@@ -829,7 +829,6 @@ lockOnBtn.InputEnded:Connect(function(input)
     end
 end)
 
--- Core lock/unlock functions using prediction
 local function doLockOn()
     local targetInfo = getNearestTarget()
     if not targetInfo then return end
@@ -848,7 +847,6 @@ local function doLockOn()
         local myChar = LocalPlayer.Character
         if not myChar then return end
 
-        -- Camera mode
         if table.find(lockMethod, "Camera") then
             workspace.CurrentCamera.CameraType = Enum.CameraType.Track
             local camPos = workspace.CurrentCamera.CFrame.Position
@@ -860,7 +858,6 @@ local function doLockOn()
             end
         end
 
-        -- Character mode with prediction
         if table.find(lockMethod, "Character") then
             local hrp = myChar:FindFirstChild("HumanoidRootPart")
             local hum = myChar:FindFirstChildOfClass("Humanoid")
@@ -868,7 +865,6 @@ local function doLockOn()
             if hrp and hum and tHRP then
                 hum.AutoRotate = false
 
-                -- ---- PREDICTION CODE ----
                 local currentPos = tHRP.Position
                 local data = targetData[tHRP] or {}
                 local lastPos = data.lastPos
@@ -886,9 +882,7 @@ local function doLockOn()
                 data.lastPos = currentPos
                 data.smoothed = predictedPos
                 targetData[tHRP] = data
-                -- ---- END PREDICTION ----
 
-                -- Rotate horizontally to predicted position
                 local offset = Vector3.new(
                     predictedPos.X - hrp.Position.X,
                     0,
@@ -921,7 +915,6 @@ lockOnBtn.MouseButton1Click:Connect(function()
     if lockOnActive then doUnlockOn() else doLockOn() end
 end)
 
--- UI toggles
 local lockToggleRow, setLockToggle, getLockToggle = makeToggle(mainS, "Prediction Lock", false, function(state)
     lockOnBtn.Visible = state
     if state then doLockOn() else doUnlockOn() end
@@ -1052,11 +1045,11 @@ makeToggle(combatS, "Side Dash Assist", false, function(state)
 end)
 
 -- ==========================================
--- TELEPORT TAB (moved from Combat, reworked TP All Loop)
+-- TELEPORT TAB
 -- ==========================================
 local teleportS = scrolls["Teleport"]
 
--- Shared TP functions (originally from TBO, but now renamed)
+-- Shared TP functions
 local function resetChar()
     workspace.FallenPartsDestroyHeight = -150
     local char = LocalPlayer.Character
@@ -1085,7 +1078,7 @@ local function breakJoints(char)
     end
 end
 
--- TP Bypass (antistuff)
+-- TP Bypass
 local bodyVelocity, bodyGyro, antistuffConn = nil, nil, nil
 local tpBypassOn = false
 
@@ -1163,14 +1156,10 @@ end
 -- TP Bypass toggle
 makeToggle(teleportS, "TP Bypass", false, function(state)
     tpBypassOn = state
-    if state then
-        antistuff()
-    else
-        unantistuff()
-    end
+    if state then antistuff() else unantistuff() end
 end)
 
--- TP Selected (unchanged)
+-- TP Selected
 local tpSelOn = false
 local tpSelConn = nil
 local selectedPlayer = nil
@@ -1184,7 +1173,6 @@ local function stopSelLoop()
     resetChar()
 end
 
--- Dropdown for player selection
 local playerNames = {}
 for _, p in ipairs(Players:GetPlayers()) do
     if p ~= LocalPlayer then table.insert(playerNames, p.Name) end
@@ -1229,17 +1217,15 @@ makeToggle(teleportS, "TP Selected", false, function(state)
     end
 end)
 
--- TP All Loop (reworked: random target, stick until death)
+-- TP All Loop - RANDOM EVERY HEARTBEAT, ALIVE FIRST, FALLBACK DEAD
 local tpLoopOn = false
 local tpLoopConn = nil
-local currentLoopTarget = nil
 
 makeToggle(teleportS, "TP All Loop", false, function(state)
     tpLoopOn = state
     if state then
         if not tpBypassOn then antistuff() end
         if tpLoopConn then tpLoopConn:Disconnect(); tpLoopConn = nil end
-        currentLoopTarget = nil
 
         tpLoopConn = RunService.Heartbeat:Connect(function()
             if not tpLoopOn then return end
@@ -1248,48 +1234,43 @@ makeToggle(teleportS, "TP All Loop", false, function(state)
             local hrp = char:FindFirstChild("HumanoidRootPart")
             if not hrp then return end
 
-            -- If we have a current target, check if still alive and valid
-            if currentLoopTarget then
-                local tChar = currentLoopTarget.Character
+            -- Gather alive players
+            local alive = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and isAlive(p) then
+                    table.insert(alive, p)
+                end
+            end
+
+            local target
+            if #alive > 0 then
+                target = alive[math.random(1, #alive)]
+            else
+                -- fallback to dead players
+                local dead = {}
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and not isAlive(p) then
+                        table.insert(dead, p)
+                    end
+                end
+                if #dead > 0 then
+                    target = dead[math.random(1, #dead)]
+                end
+            end
+
+            if target then
+                local tChar = target.Character
                 if tChar then
                     local tHRP = tChar:FindFirstChild("HumanoidRootPart")
                     local tHum = tChar:FindFirstChildOfClass("Humanoid")
-                    if tHRP and tHum and tHum.Health > 0 then
-                        -- Still alive, teleport to it
+                    if tHRP and tHum then
                         tpToSpam(hrp, tHRP, tHum)
-                        setTeleportStatus("🔁 " .. currentLoopTarget.Name .. " (alive)", Color3.fromRGB(255, 100, 100))
-                        return
+                        local tag = isAlive(target) and "A" or "D"
+                        setTeleportStatus("🔁 " .. tag .. " " .. target.Name, Color3.fromRGB(255, 180, 100))
                     end
                 end
-                -- Target dead or invalid, clear it
-                currentLoopTarget = nil
-            end
-
-            -- No current target: pick a random alive player
-            local alivePlayers = {}
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and isAlive(p) then
-                    table.insert(alivePlayers, p)
-                end
-            end
-            if #alivePlayers > 0 then
-                currentLoopTarget = alivePlayers[math.random(1, #alivePlayers)]
-                setTeleportStatus("🔁 Switching to " .. currentLoopTarget.Name, Color3.fromRGB(255, 200, 100))
-                -- Teleport immediately (next heartbeat will handle it)
             else
-                -- No alive players, fallback to dead players (pick random)
-                local deadPlayers = {}
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer and not isAlive(p) then
-                        table.insert(deadPlayers, p)
-                    end
-                end
-                if #deadPlayers > 0 then
-                    currentLoopTarget = deadPlayers[math.random(1, #deadPlayers)]
-                    setTeleportStatus("🔁 " .. currentLoopTarget.Name .. " (dead)", Color3.fromRGB(255, 150, 50))
-                else
-                    setTeleportStatus("🔁 No targets available", Color3.fromRGB(200, 200, 200))
-                end
+                setTeleportStatus("🔁 No targets", Color3.fromRGB(200, 200, 200))
             end
         end)
     else
@@ -1297,32 +1278,8 @@ makeToggle(teleportS, "TP All Loop", false, function(state)
         if not tpBypassOn then unantistuff() end
         workspace.FallenPartsDestroyHeight = -150
         resetChar()
-        currentLoopTarget = nil
         setTeleportStatus("TP Loop OFF", Color3.fromRGB(150, 150, 150))
     end
-end)
-
--- Kill All button (unchanged)
-makeButton(teleportS, "Kill All", function()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    local players = Players:GetPlayers()
-    for _, p in ipairs(players) do
-        if p ~= LocalPlayer then
-            local tChar = p.Character
-            if tChar then
-                local tHRP = tChar:FindFirstChild("HumanoidRootPart")
-                local tHum = tChar:FindFirstChildOfClass("Humanoid")
-                if tHRP and tHum then
-                    tpToSpam(hrp, tHRP, tHum)
-                    task.wait(0.05)
-                end
-            end
-        end
-    end
-    setTeleportStatus("Kill All executed", Color3.fromRGB(255, 200, 100))
 end)
 
 -- Status label for Teleport tab
@@ -1361,17 +1318,15 @@ statusLblTp.Parent = statusRowTp
 -- ==========================================
 local autoS = scrolls["Auto"]
 
--- ---- M1 ASSIST (UpperCut / DownSlam) ----
 makeSectionRow(autoS, "M1 Assist")
 
-local M1Method = "Hop"  -- "Hop" = UpperCut, "Side" = DownSlam
+local M1Method = "Hop"
 local autoM1Active = false
 local autoM1RenderStep = nil
 local autoM1Connections = {}
 local comboCount = 0
 local lastHitTime = 0
 
--- The actual M1 function (fires remote + applies velocity)
 local function doM1()
     local char = LocalPlayer.Character
     if not char then return end
@@ -1379,7 +1334,6 @@ local function doM1()
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hrp or not hum then return end
 
-    -- Fire M1 remote (same as normal click)
     local movesetName = LocalPlayer:GetAttribute("Moveset")
     if movesetName then
         local service = RS.Knit.Knit.Services[movesetName .. "Service"]
@@ -1390,14 +1344,13 @@ local function doM1()
         end
     end
 
-    -- Apply velocity based on selected method
     local bv = Instance.new("BodyVelocity")
     bv.MaxForce = Vector3.new(100000, 100000, 100000)
     if M1Method == "Hop" then
-        bv.Velocity = Vector3.new(0, 25, 0)    -- upward (uppercut)
+        bv.Velocity = Vector3.new(0, 25, 0)
     elseif M1Method == "Side" then
         local right = hrp.CFrame.RightVector * 20
-        bv.Velocity = Vector3.new(right.X, 0, right.Z)  -- sideways (downslam)
+        bv.Velocity = Vector3.new(right.X, 0, right.Z)
     end
     bv.Parent = hrp
     task.delay(0.2, function()
@@ -1411,37 +1364,29 @@ local function startM1Assist()
     comboCount = 0
     lastHitTime = 0
 
-    -- Render step: spam M1
     autoM1RenderStep = RunService:BindToRenderStep("M1-Farm", 0, function()
         if not autoM1Active then return end
         doM1()
     end)
 
-    -- Listen to "Swing2" to reset animations and maintain combo
     local function onSwing2(...)
         local args = {...}
         if args[1] == "Swing2" and args[2] == LocalPlayer.Character and args[3] == 3 then
             local now = tick()
-            if now - lastHitTime > 2 then
-                comboCount = 0
-            end
+            if now - lastHitTime > 2 then comboCount = 0 end
             lastHitTime = now
             comboCount = comboCount + 1
             if comboCount >= 4 then
                 comboCount = 0
-                -- Reset character to clear animations
                 local char = LocalPlayer.Character
                 if char then
                     local hum = char:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        hum:Move(Vector3.new(0,0,0), false)
-                    end
+                    if hum then hum:Move(Vector3.new(0,0,0), false) end
                 end
             end
         end
     end
 
-    -- Connect to all RE.Effects for Swing2
     for _, service in ipairs(RS.Knit.Knit.Services:GetChildren()) do
         if service:FindFirstChild("RE") and service.RE:FindFirstChild("Effects") then
             local conn = service.RE.Effects.OnClientEvent:Connect(onSwing2)
@@ -1466,22 +1411,15 @@ local function stopM1Assist()
     print("✅ Auto M1 stopped")
 end
 
--- Dropdown with display names matching the screenshot
 local m1MethodItems = {"UpperCut", "DownSlam"}
 local m1Dropdown, updateM1Dropdown, getM1Method = makeDropdown(autoS, "M1 Method", m1MethodItems, "UpperCut", function(value)
     M1Method = (value == "UpperCut") and "Hop" or "Side"
 end)
 
--- Toggle for M1 Assist
 makeToggle(autoS, "M1 Assist", false, function(state)
-    if state then
-        startM1Assist()
-    else
-        stopM1Assist()
-    end
+    if state then startM1Assist() else stopM1Assist() end
 end)
 
--- ---- AUTO BURST ----
 makeSectionRow(autoS, "Auto Burst")
 
 local autoBurstActive = false
@@ -1542,13 +1480,11 @@ local extraS = scrolls["Extra"]
 
 makeSectionRow(extraS, "Emotes")
 
--- Replaced the toggle with a button that unlocks extra emote slots
 makeButton(extraS, "Emote Unlocker", function()
     local gp = game:GetService("Players").LocalPlayer:WaitForChild("Gamepasses")
     gp:SetAttribute("742180133", true)
     gp:SetAttribute("1151174294", true)
 
-    -- Also make the extra emote slots visible
     pcall(function()
         local Menus = LocalPlayer.PlayerGui:WaitForChild("Menus")
         for _, obj in ipairs(Menus:GetDescendants()) do
@@ -1571,7 +1507,6 @@ makeButton(extraS, "Emote Unlocker", function()
         end
     end)
 
-    -- Show a confirmation notification
     game:GetService("StarterGui"):SetCore("SendNotification", {
         Title = "Emote Unlocker",
         Text = "Extra emote slots unlocked!",
@@ -1594,7 +1529,6 @@ local MAX_Y = 1000
 
 local function scanItems()
     local found = {}
-    local playerChar = LocalPlayer.Character
     for _, obj in ipairs(workspace:GetDescendants()) do
         local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt")
         if not prompt then
@@ -1630,7 +1564,6 @@ local function scanItems()
 end
 
 local function findItem(itemName)
-    local playerChar = LocalPlayer.Character
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj.Name == itemName then
             local prompt = obj:FindFirstChildWhichIsA("ProximityPrompt")
@@ -1809,14 +1742,12 @@ makeCorner(credLbl, 6)
 -- RESET ON RESPAWN (clean up TP features)
 -- ==========================================
 LocalPlayer.CharacterAdded:Connect(function()
-    -- Reset TP state
     tpBypassOn = false
     unantistuff()
     tpSelOn = false
     if tpSelConn then tpSelConn:Disconnect(); tpSelConn = nil end
     tpLoopOn = false
     if tpLoopConn then tpLoopConn:Disconnect(); tpLoopConn = nil end
-    currentLoopTarget = nil
     workspace.FallenPartsDestroyHeight = -150
     selectedPlayer = nil
     setTeleportStatus("Respawned", Color3.fromRGB(100, 200, 100))
@@ -1827,4 +1758,4 @@ end)
 -- ==========================================
 switchTab("Main")
 
-print("✅ ｢KZM」 v1.3 with Teleport Tools (Bypass, Selected, All Loop, Kill All) loaded")
+print("✅ ｢KZM」 v1.3 with Teleport Tools (Bypass, Selected, All Loop) loaded")
