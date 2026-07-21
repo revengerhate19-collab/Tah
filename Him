@@ -5,6 +5,11 @@
 -- + Emote Unlocker (replaces Extra Emote Slots toggle)
 -- + Integrated Teleport Tools (Bypass, Selected, All Loop)
 -- ==========================================
+-- TELEPORT BEHAVIOR UPDATED TO TBO TOOLS:
+--   - TP Selected: opens a player panel (pop-up) with [A]/[D] tags
+--   - TP All Loop: cycles through players in order (alive sorted by distance, then dead), with caching
+--   - All other features identical to TBO Tools' teleport core
+-- ==========================================
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -1045,11 +1050,11 @@ makeToggle(combatS, "Side Dash Assist", false, function(state)
 end)
 
 -- ==========================================
--- TELEPORT TAB
+-- TELEPORT TAB (UPDATED TO TBO TOOLS BEHAVIOR)
 -- ==========================================
 local teleportS = scrolls["Teleport"]
 
--- Shared TP functions
+-- Shared TP functions (identical to TBO Tools)
 local function resetChar()
     workspace.FallenPartsDestroyHeight = -150
     local char = LocalPlayer.Character
@@ -1116,7 +1121,7 @@ local function unantistuff()
     if antistuffConn then antistuffConn:Disconnect(); antistuffConn = nil end
 end
 
--- Core TP spam function
+-- Core TP spam function (same as TBO Tools)
 local function tpToSpam(hrp, tHRP, tHum)
     local predicted = tHRP.Position + (tHum.MoveDirection * 0.8 * tHum.WalkSpeed)
     local dest = CFrame.new(predicted - tHRP.CFrame.LookVector * 2, predicted)
@@ -1153,13 +1158,38 @@ local function tpToSpam(hrp, tHRP, tHum)
     workspace.FallenPartsDestroyHeight = -150
 end
 
+-- TBO Tools: getSortedPlayers (alive sorted by distance, then dead)
+local function getSortedPlayers()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local alive, dead = {}, {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            if isAlive(p) then table.insert(alive, p)
+            else table.insert(dead, p) end
+        end
+    end
+    if hrp then
+        table.sort(alive, function(a, b)
+            local aH = a.Character and a.Character:FindFirstChild("HumanoidRootPart")
+            local bH = b.Character and b.Character:FindFirstChild("HumanoidRootPart")
+            if not aH then return false end
+            if not bH then return true end
+            return (hrp.Position - aH.Position).Magnitude < (hrp.Position - bH.Position).Magnitude
+        end)
+    end
+    return alive, dead
+end
+
 -- TP Bypass toggle
 makeToggle(teleportS, "TP Bypass", false, function(state)
     tpBypassOn = state
     if state then antistuff() else unantistuff() end
 end)
 
--- TP Selected
+-- ==========================================
+-- TP Selected: uses player panel (pop-up) like TBO Tools
+-- ==========================================
 local tpSelOn = false
 local tpSelConn = nil
 local selectedPlayer = nil
@@ -1171,114 +1201,184 @@ local function stopSelLoop()
     if not tpBypassOn then unantistuff() end
     workspace.FallenPartsDestroyHeight = -150
     resetChar()
+    setTeleportStatus("TP Selected OFF", Color3.fromRGB(150, 150, 150))
 end
 
-local playerNames = {}
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then table.insert(playerNames, p.Name) end
-end
-local tpSelDropdown, updateTpSelList, getTpSelPlayer = makeDropdown(teleportS, "TP Selected Target", playerNames, playerNames[1], function(value)
-    selectedPlayer = Players:FindFirstChild(value)
-end)
+-- Player Panel (pop-up)
+local PlayerPanel = Instance.new("Frame")
+PlayerPanel.Size = UDim2.new(0, 190, 0, 280)
+PlayerPanel.Position = UDim2.new(0.5, -95, 0.5, -140)
+PlayerPanel.BackgroundColor3 = Color3.fromRGB(10, 10, 20)
+PlayerPanel.BorderSizePixel = 0
+PlayerPanel.Visible = false
+PlayerPanel.ZIndex = 20
+PlayerPanel.Parent = screenGui
+Instance.new("UICorner", PlayerPanel).CornerRadius = UDim.new(0, 14)
+local PanelStroke = Instance.new("UIStroke", PlayerPanel)
+PanelStroke.Color = Color3.fromRGB(200, 140, 0)
+PanelStroke.Thickness = 1.5
 
-makeToggle(teleportS, "TP Selected", false, function(state)
+local PanelTitle = Instance.new("TextLabel")
+PanelTitle.Size = UDim2.new(1, -36, 0, 36)
+PanelTitle.BackgroundColor3 = Color3.fromRGB(18, 18, 40)
+PanelTitle.BorderSizePixel = 0
+PanelTitle.Text = "Pick Player"
+PanelTitle.TextSize = 13
+PanelTitle.Font = Enum.Font.GothamBold
+PanelTitle.TextColor3 = Color3.fromRGB(200, 140, 0)
+PanelTitle.ZIndex = 21
+PanelTitle.Parent = PlayerPanel
+Instance.new("UICorner", PanelTitle).CornerRadius = UDim.new(0, 14)
+
+local PanelClose = Instance.new("TextButton")
+PanelClose.Size = UDim2.new(0, 30, 0, 30)
+PanelClose.Position = UDim2.new(1, -34, 0, 3)
+PanelClose.BackgroundColor3 = Color3.fromRGB(170, 40, 40)
+PanelClose.Text = "X"
+PanelClose.TextSize = 13
+PanelClose.Font = Enum.Font.GothamBold
+PanelClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+PanelClose.BorderSizePixel = 0
+PanelClose.ZIndex = 22
+PanelClose.Parent = PlayerPanel
+Instance.new("UICorner", PanelClose).CornerRadius = UDim.new(0, 8)
+
+local PlayerScroll = Instance.new("ScrollingFrame")
+PlayerScroll.Size = UDim2.new(1, -10, 1, -44)
+PlayerScroll.Position = UDim2.new(0, 5, 0, 40)
+PlayerScroll.BackgroundTransparency = 1
+PlayerScroll.BorderSizePixel = 0
+PlayerScroll.ScrollBarThickness = 3
+PlayerScroll.ScrollBarImageColor3 = Color3.fromRGB(200, 140, 0)
+PlayerScroll.ZIndex = 21
+PlayerScroll.Parent = PlayerPanel
+local PlayerListLayout = Instance.new("UIListLayout")
+PlayerListLayout.SortOrder = Enum.SortOrder.Name
+PlayerListLayout.Padding = UDim.new(0, 4)
+PlayerListLayout.Parent = PlayerScroll
+
+local panelOpen = false
+
+local function closePanel()
+    panelOpen = false
+    PlayerPanel.Visible = false
+end
+
+local function openPanel()
+    panelOpen = true
+    PlayerPanel.Visible = true
+    for _, c in ipairs(PlayerScroll:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    local count = 0
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local alive = isAlive(p)
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, 0, 0, 38)
+            btn.BackgroundColor3 = Color3.fromRGB(16, 16, 32)
+            btn.BorderSizePixel = 0
+            btn.Text = (alive and "[A] " or "[D] ") .. p.Name
+            btn.TextSize = 12
+            btn.Font = Enum.Font.GothamBold
+            btn.TextColor3 = alive and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
+            btn.ZIndex = 22
+            btn.Parent = PlayerScroll
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+            btn.MouseButton1Click:Connect(function()
+                selectedPlayer = p
+                closePanel()
+                if tpSelConn then tpSelConn:Disconnect(); tpSelConn = nil end
+                tpSelOn = true
+                if not tpBypassOn then antistuff() end
+                setTeleportStatus("TP -> " .. p.Name, Color3.fromRGB(255, 180, 80))
+                tpSelConn = RunService.Heartbeat:Connect(function()
+                    if not tpSelOn then return end
+                    local char = LocalPlayer.Character
+                    if not char then return end
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if not hrp then return end
+                    local tChar = selectedPlayer and selectedPlayer.Character
+                    if not tChar then return end
+                    local tHRP = tChar:FindFirstChild("HumanoidRootPart")
+                    local tHum = tChar:FindFirstChildOfClass("Humanoid")
+                    if not tHRP or not tHum then return end
+                    tpToSpam(hrp, tHRP, tHum)
+                end)
+            end)
+            count = count + 1
+        end
+    end
+    PlayerScroll.CanvasSize = UDim2.new(0, 0, 0, count * 42)
+end
+
+PanelClose.MouseButton1Click:Connect(function() closePanel() end)
+
+-- Toggle for TP Selected: opens panel, or stops if already on
+local tpSelToggleRow, setTpSelToggle, getTpSelState = makeToggle(teleportS, "TP Selected", false, function(state)
     if state then
-        if not selectedPlayer then
-            local first = Players:GetPlayers()[1]
-            if first and first ~= LocalPlayer then selectedPlayer = first end
-        end
-        if not selectedPlayer then
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "TP Selected",
-                Text = "No valid player found.",
-                Duration = 2
-            })
-            return
-        end
-        tpSelOn = true
-        if not tpBypassOn then antistuff() end
-        setTeleportStatus("TP -> " .. selectedPlayer.Name, Color3.fromRGB(255, 180, 80))
-        if tpSelConn then tpSelConn:Disconnect(); tpSelConn = nil end
-        tpSelConn = RunService.Heartbeat:Connect(function()
-            if not tpSelOn then return end
-            local char = LocalPlayer.Character
-            if not char then return end
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if not hrp then return end
-            local tChar = selectedPlayer and selectedPlayer.Character
-            if not tChar then return end
-            local tHRP = tChar:FindFirstChild("HumanoidRootPart")
-            local tHum = tChar:FindFirstChildOfClass("Humanoid")
-            if not tHRP or not tHum then return end
-            tpToSpam(hrp, tHRP, tHum)
-        end)
+        if panelOpen then closePanel() else openPanel() end
     else
         stopSelLoop()
+        setTeleportStatus("TP Selected OFF", Color3.fromRGB(150, 150, 150))
     end
 end)
 
--- TP All Loop - RANDOM EVERY HEARTBEAT, ALIVE FIRST, FALLBACK DEAD
+-- ==========================================
+-- TP All Loop: cycles through players in order (TBO Tools style)
+-- ==========================================
 local tpLoopOn = false
 local tpLoopConn = nil
 
 makeToggle(teleportS, "TP All Loop", false, function(state)
     tpLoopOn = state
-    if state then
+    if tpLoopOn then
         if not tpBypassOn then antistuff() end
+        setTeleportStatus("🔁  TP Loop ON (Joint Break)", Color3.fromRGB(255, 80, 80))
         if tpLoopConn then tpLoopConn:Disconnect(); tpLoopConn = nil end
 
-        tpLoopConn = RunService.Heartbeat:Connect(function()
+        local index = 1
+        local cached = {}
+        local refreshTimer = 0
+
+        tpLoopConn = RunService.Heartbeat:Connect(function(dt)
             if not tpLoopOn then return end
             local char = LocalPlayer.Character
             if not char then return end
             local hrp = char:FindFirstChild("HumanoidRootPart")
             if not hrp then return end
 
-            -- Gather alive players
-            local alive = {}
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and isAlive(p) then
-                    table.insert(alive, p)
+            refreshTimer = refreshTimer + dt
+            if refreshTimer >= 0.5 or #cached == 0 then
+                refreshTimer = 0
+                local alive, dead = getSortedPlayers()
+                cached = #alive > 0 and alive or dead
+                if index > #cached then index = 1 end
+            end
+
+            if #cached == 0 then return end
+            if index > #cached then index = 1 end
+
+            local target = cached[index]
+            local tChar = target and target.Character
+            if tChar then
+                local tHRP = tChar:FindFirstChild("HumanoidRootPart")
+                local tHum = tChar:FindFirstChildOfClass("Humanoid")
+                if tHRP and tHum then
+                    tpToSpam(hrp, tHRP, tHum)
+                    local tag = isAlive(target) and "[A]" or "[D]"
+                    setTeleportStatus("🔁 " .. tag .. " " .. target.Name, Color3.fromRGB(255, 100, 100))
                 end
             end
 
-            local target
-            if #alive > 0 then
-                target = alive[math.random(1, #alive)]
-            else
-                -- fallback to dead players
-                local dead = {}
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer and not isAlive(p) then
-                        table.insert(dead, p)
-                    end
-                end
-                if #dead > 0 then
-                    target = dead[math.random(1, #dead)]
-                end
-            end
-
-            if target then
-                local tChar = target.Character
-                if tChar then
-                    local tHRP = tChar:FindFirstChild("HumanoidRootPart")
-                    local tHum = tChar:FindFirstChildOfClass("Humanoid")
-                    if tHRP and tHum then
-                        tpToSpam(hrp, tHRP, tHum)
-                        local tag = isAlive(target) and "A" or "D"
-                        setTeleportStatus("🔁 " .. tag .. " " .. target.Name, Color3.fromRGB(255, 180, 100))
-                    end
-                end
-            else
-                setTeleportStatus("🔁 No targets", Color3.fromRGB(200, 200, 200))
-            end
+            index = index + 1
         end)
     else
         if tpLoopConn then tpLoopConn:Disconnect(); tpLoopConn = nil end
         if not tpBypassOn then unantistuff() end
         workspace.FallenPartsDestroyHeight = -150
         resetChar()
-        setTeleportStatus("TP Loop OFF", Color3.fromRGB(150, 150, 150))
+        setTeleportStatus("🔁  TP Loop OFF", Color3.fromRGB(150, 150, 150))
     end
 end)
 
@@ -1751,6 +1851,9 @@ LocalPlayer.CharacterAdded:Connect(function()
     workspace.FallenPartsDestroyHeight = -150
     selectedPlayer = nil
     setTeleportStatus("Respawned", Color3.fromRGB(100, 200, 100))
+    -- Ensure toggles reflect off state
+    setTpSelToggle(false)
+    -- Also reset any other UI states if needed
 end)
 
 -- ==========================================
@@ -1758,4 +1861,4 @@ end)
 -- ==========================================
 switchTab("Main")
 
-print("✅ ｢KZM」 v1.3 with Teleport Tools (Bypass, Selected, All Loop) loaded")
+print("✅ ｢KZM」 v1.3 with Teleport Tools (Bypass, Selected, All Loop) loaded - TBO behavior integrated")
