@@ -8,6 +8,7 @@
 -- + Auto Ratio (Nanami) – FIXED
 -- + Perfect Swap (Todo)
 -- + Auto Garuda Rebound
+-- + GUI always on top (above game UI) + Lock button mid-screen
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -37,16 +38,18 @@ local C = {
 }
 
 -- ==========================================
--- SCREEN GUI
+-- SCREEN GUI — HIGHEST ZINDEX TO OVERLAY GAME UI
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "KZM"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.ZIndex = 100                -- on top of everything
+screenGui.DisplayOrder = 100          -- extra layer
 screenGui.Parent = LocalPlayer.PlayerGui
 
 -- ==========================================
--- TOGGLE BUTTON (always visible)
+-- TOGGLE BUTTON (always visible, on top)
 -- ==========================================
 local toggleWindowBtn = Instance.new("TextButton")
 toggleWindowBtn.Size = UDim2.new(0, 72, 0, 24)
@@ -57,6 +60,7 @@ toggleWindowBtn.TextColor3 = C.white
 toggleWindowBtn.Font = Enum.Font.GothamBold
 toggleWindowBtn.TextSize = 11
 toggleWindowBtn.BorderSizePixel = 0
+toggleWindowBtn.ZIndex = 100
 toggleWindowBtn.Parent = screenGui
 local twCorner = Instance.new("UICorner")
 twCorner.CornerRadius = UDim.new(0, 6)
@@ -67,7 +71,7 @@ twStroke.Thickness = 1.5
 twStroke.Parent = toggleWindowBtn
 
 -- ==========================================
--- MAIN WINDOW — slightly bigger (540 x 340)
+-- MAIN WINDOW — slightly bigger (540 x 340) with ZIndex 100
 -- ==========================================
 local WIN_W = 540
 local WIN_H = 340
@@ -80,7 +84,7 @@ window.BackgroundColor3 = C.bg
 window.BorderSizePixel = 0
 window.Active = true
 window.Visible = true
-window.ZIndex = 5  -- lower than lock-on button
+window.ZIndex = 100
 window.Parent = screenGui
 Instance.new("UICorner", window).CornerRadius = UDim.new(0, 10)
 
@@ -113,6 +117,7 @@ titleBar.Name = "TitleBar"
 titleBar.Size = UDim2.new(1, 0, 0, TITLE_H)
 titleBar.BackgroundColor3 = C.panel
 titleBar.BorderSizePixel = 0
+titleBar.ZIndex = 101
 titleBar.Parent = window
 Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
 
@@ -162,6 +167,7 @@ minBtn.TextColor3 = C.white
 minBtn.Font = Enum.Font.GothamBold
 minBtn.TextSize = 13
 minBtn.BorderSizePixel = 0
+minBtn.ZIndex = 102
 minBtn.Parent = titleBar
 Instance.new("UICorner", minBtn).CornerRadius = UDim.new(1, 0)
 
@@ -212,6 +218,7 @@ tabBar.Size = UDim2.new(1, 0, 0, TAB_H)
 tabBar.Position = UDim2.new(0, 0, 0, TITLE_H)
 tabBar.BackgroundColor3 = Color3.fromRGB(14, 5, 20)
 tabBar.BorderSizePixel = 0
+tabBar.ZIndex = 101
 tabBar.Parent = window
 
 local tabLayout = Instance.new("UIListLayout")
@@ -238,6 +245,7 @@ contentFrame.Size = UDim2.new(1, 0, 1, -HEADER_H)
 contentFrame.Position = UDim2.new(0, 0, 0, HEADER_H)
 contentFrame.BackgroundTransparency = 1
 contentFrame.ClipsDescendants = true
+contentFrame.ZIndex = 100
 contentFrame.Parent = window
 
 -- ==========================================
@@ -269,6 +277,7 @@ local function makeScrollList(parent)
     sf.ScrollBarImageColor3 = C.accent
     sf.ScrollingDirection = Enum.ScrollingDirection.Y
     sf.CanvasSize = UDim2.new(0, 0, 0, 0)
+    sf.ZIndex = 100
     sf.Parent = parent
 
     local layout = Instance.new("UIListLayout")
@@ -296,6 +305,7 @@ local function makeToggle(parent, labelText, default, callback)
     row.Size = UDim2.new(1, -4, 0, 28)
     row.BackgroundColor3 = C.row
     row.BorderSizePixel = 0
+    row.ZIndex = 100
     row.Parent = parent
     makeCorner(row, 6)
     makeStroke(row, C.stroke, 1, 0.6)
@@ -309,6 +319,7 @@ local function makeToggle(parent, labelText, default, callback)
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 101
     lbl.Parent = row
 
     local toggleBG = Instance.new("Frame")
@@ -316,6 +327,7 @@ local function makeToggle(parent, labelText, default, callback)
     toggleBG.Position = UDim2.new(1, -42, 0.5, -9)
     toggleBG.BackgroundColor3 = default and C.toggleOn or C.toggleOff
     toggleBG.BorderSizePixel = 0
+    toggleBG.ZIndex = 101
     toggleBG.Parent = row
     makeCorner(toggleBG, 9)
 
@@ -324,6 +336,7 @@ local function makeToggle(parent, labelText, default, callback)
     knob.Position = default and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
     knob.BackgroundColor3 = C.white
     knob.BorderSizePixel = 0
+    knob.ZIndex = 102
     knob.Parent = toggleBG
     makeCorner(knob, 6)
 
@@ -331,6 +344,7 @@ local function makeToggle(parent, labelText, default, callback)
     btn.Size = UDim2.new(1, 0, 1, 0)
     btn.BackgroundTransparency = 1
     btn.Text = ""
+    btn.ZIndex = 101
     btn.Parent = row
 
     local isOn = default or false
@@ -368,6 +382,7 @@ local function makeButton(parent, labelText, callback)
     row.TextColor3 = C.white
     row.Font = Enum.Font.GothamBold
     row.TextSize = 11
+    row.ZIndex = 100
     row.Parent = parent
     makeCorner(row, 6)
     makeStroke(row, C.stroke, 1, 0.4)
@@ -395,6 +410,7 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     row.Size = UDim2.new(1, -4, 0, 42)
     row.BackgroundColor3 = C.row
     row.BorderSizePixel = 0
+    row.ZIndex = 100
     row.Parent = parent
     makeCorner(row, 6)
     makeStroke(row, C.stroke, 1, 0.6)
@@ -408,6 +424,7 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 101
     lbl.Parent = row
 
     local valLbl = Instance.new("TextLabel")
@@ -419,6 +436,7 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     valLbl.Font = Enum.Font.GothamBold
     valLbl.TextSize = 11
     valLbl.TextXAlignment = Enum.TextXAlignment.Right
+    valLbl.ZIndex = 101
     valLbl.Parent = row
 
     local track = Instance.new("Frame")
@@ -426,6 +444,7 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     track.Position = UDim2.new(0, 8, 0, 27)
     track.BackgroundColor3 = C.toggleOff
     track.BorderSizePixel = 0
+    track.ZIndex = 100
     track.Parent = row
     makeCorner(track, 3)
 
@@ -433,6 +452,7 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     fill.BackgroundColor3 = C.accent
     fill.BorderSizePixel = 0
+    fill.ZIndex = 101
     fill.Parent = track
     makeCorner(fill, 3)
 
@@ -450,7 +470,7 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     knob.Position = UDim2.new((default - min) / (max - min), 0, 0.5, 0)
     knob.BackgroundColor3 = C.white
     knob.BorderSizePixel = 0
-    knob.ZIndex = 2
+    knob.ZIndex = 102
     knob.Parent = track
     makeCorner(knob, 6)
 
@@ -494,6 +514,7 @@ local function makeSectionRow(parent, text)
     f.Size = UDim2.new(1, -4, 0, 20)
     f.BackgroundColor3 = Color3.fromRGB(30, 8, 45)
     f.BorderSizePixel = 0
+    f.ZIndex = 100
     f.Parent = parent
     makeCorner(f, 5)
 
@@ -512,6 +533,7 @@ local function makeSectionRow(parent, text)
     lbl.TextColor3 = Color3.fromRGB(255, 160, 180)
     lbl.Font = Enum.Font.GothamBold
     lbl.TextSize = 10
+    lbl.ZIndex = 101
     lbl.Parent = f
 
     return f
@@ -526,6 +548,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
     row.BackgroundColor3 = C.row
     row.BorderSizePixel = 0
     row.ClipsDescendants = false
+    row.ZIndex = 100
     row.Parent = parent
     makeCorner(row, 6)
     makeStroke(row, C.stroke, 1, 0.6)
@@ -539,6 +562,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.ZIndex = 101
     lbl.Parent = row
 
     local selectedLbl = Instance.new("TextLabel")
@@ -550,6 +574,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
     selectedLbl.Font = Enum.Font.GothamBold
     selectedLbl.TextSize = 10
     selectedLbl.TextXAlignment = Enum.TextXAlignment.Right
+    selectedLbl.ZIndex = 101
     selectedLbl.Parent = row
 
     local listFrame = Instance.new("Frame")
@@ -559,7 +584,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
     listFrame.BorderSizePixel = 0
     listFrame.ClipsDescendants = true
     listFrame.Visible = false
-    listFrame.ZIndex = 5
+    listFrame.ZIndex = 102
     listFrame.Parent = row
     makeCorner(listFrame, 5)
 
@@ -570,7 +595,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
     listScroller.CanvasSize = UDim2.new(0, 0, 0, 0)
     listScroller.ScrollBarThickness = 3
     listScroller.ScrollBarImageColor3 = C.accent
-    listScroller.ZIndex = 5
+    listScroller.ZIndex = 102
     listScroller.Parent = listFrame
 
     local listLayout = Instance.new("UIListLayout")
@@ -583,6 +608,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
     btn.Position = UDim2.new(0, 0, 0, 0)
     btn.BackgroundTransparency = 1
     btn.Text = ""
+    btn.ZIndex = 101
     btn.Parent = row
 
     local selectedItem = default
@@ -613,7 +639,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
             itemBtn.TextColor3 = C.text
             itemBtn.Font = Enum.Font.Gotham
             itemBtn.TextSize = 10
-            itemBtn.ZIndex = 6
+            itemBtn.ZIndex = 103
             itemBtn.Parent = listScroller
             makeCorner(itemBtn, 4)
             if itemName == selectedItem then selectedExists = true end
@@ -676,6 +702,7 @@ for _, name in ipairs(tabNames) do
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 9
     btn.BorderSizePixel = 0
+    btn.ZIndex = 101
     btn.Parent = tabBar
     makeCorner(btn, 5)
 
@@ -683,6 +710,7 @@ for _, name in ipairs(tabNames) do
     tabFrame.Size = UDim2.new(1, 0, 1, 0)
     tabFrame.BackgroundTransparency = 1
     tabFrame.Visible = false
+    tabFrame.ZIndex = 100
     tabFrame.Parent = contentFrame
 
     tabFrames[name] = tabFrame
@@ -795,17 +823,17 @@ local lockOnActive = false
 local lockedTarget = nil
 local lockMethod = {}
 
--- Lock button (floating) – now ZIndex = 10 and positioned higher
+-- Lock button (floating) – now at mid-screen with ZIndex 101
 local lockOnBtn = Instance.new("ImageButton")
 lockOnBtn.Name = "LockOnBtn"
 lockOnBtn.Size = UDim2.new(0, 70, 0, 70)
-lockOnBtn.Position = UDim2.new(0.5, -35, 0.72, 0)  -- moved up (above stat bar)
+lockOnBtn.Position = UDim2.new(0.5, -35, 0.45, 0)  -- mid-screen
 lockOnBtn.BackgroundTransparency = 1
 lockOnBtn.Image = "rbxassetid://11738355467"
 lockOnBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
 lockOnBtn.ImageTransparency = 0.1
 lockOnBtn.Visible = false
-lockOnBtn.ZIndex = 10  -- always on top
+lockOnBtn.ZIndex = 101  -- above main window
 lockOnBtn.Parent = screenGui
 
 local loDragging, loDragStart, loStartPos
@@ -1295,6 +1323,7 @@ statusRowTp.Name = "StatusRow"
 statusRowTp.Size = UDim2.new(1, -4, 0, 20)
 statusRowTp.BackgroundColor3 = C.row
 statusRowTp.BorderSizePixel = 0
+statusRowTp.ZIndex = 100
 statusRowTp.Parent = teleportS
 makeCorner(statusRowTp, 5)
 makeStroke(statusRowTp, C.stroke, 1, 0.5)
@@ -1307,6 +1336,7 @@ statusLblTp.TextColor3 = C.textDim
 statusLblTp.Font = Enum.Font.Gotham
 statusLblTp.TextSize = 10
 statusLblTp.TextXAlignment = Enum.TextXAlignment.Center
+statusLblTp.ZIndex = 101
 statusLblTp.Parent = statusRowTp
 
 -- ==========================================
@@ -1804,6 +1834,7 @@ local statusRowExtra = Instance.new("Frame")
 statusRowExtra.Size = UDim2.new(1, -4, 0, 20)
 statusRowExtra.BackgroundColor3 = C.row
 statusRowExtra.BorderSizePixel = 0
+statusRowExtra.ZIndex = 100
 statusRowExtra.Parent = extraS
 makeCorner(statusRowExtra, 5)
 makeStroke(statusRowExtra, C.stroke, 1, 0.5)
@@ -1816,6 +1847,7 @@ statusLblExtra.TextColor3 = C.textDim
 statusLblExtra.Font = Enum.Font.Gotham
 statusLblExtra.TextSize = 10
 statusLblExtra.TextXAlignment = Enum.TextXAlignment.Center
+statusLblExtra.ZIndex = 101
 statusLblExtra.Parent = statusRowExtra
 
 makeButton(extraS, "⬆ Pick Up Selected Item", function()
@@ -1920,12 +1952,20 @@ local credLbl = Instance.new("TextLabel")
 credLbl.Size = UDim2.new(1, -4, 0, 36)
 credLbl.BackgroundColor3 = C.row
 credLbl.BorderSizePixel = 0
-credLbl.Text = "｢KZM」 • Made for JJS\nBuilt by KZM"
-credLbl.TextColor3 = C.textDim
-credLbl.Font = Enum.Font.Gotham
-credLbl.TextSize = 10
+credLbl.ZIndex = 100
 credLbl.Parent = configS
 makeCorner(credLbl, 6)
+
+local credText = Instance.new("TextLabel")
+credText.Size = UDim2.new(1, 0, 1, 0)
+credText.BackgroundTransparency = 1
+credText.Text = "｢KZM」 • Made for JJS\nBuilt by KZM"
+credText.TextColor3 = C.textDim
+credText.Font = Enum.Font.Gotham
+credText.TextSize = 10
+credText.TextXAlignment = Enum.TextXAlignment.Center
+credText.ZIndex = 101
+credText.Parent = credLbl
 
 -- ==========================================
 -- RESET ON RESPAWN (clean up TP features)
@@ -1947,4 +1987,4 @@ end)
 -- ==========================================
 switchTab("Main")
 
-print("✅ ｢KZM」 v1.3 with all fixes loaded (Auto Ratio fixed, Perfect Swap, Walk into Domains, Auto Garuda Rebound)")
+print("✅ ｢KZM」 v1.3 with all fixes loaded (Auto Ratio fixed, Perfect Swap, Walk into Domains, Auto Garuda Rebound, GUI on top, lock mid-screen)")
