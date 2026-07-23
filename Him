@@ -8,7 +8,6 @@
 -- + Auto Ratio (Nanami) – FIXED
 -- + Perfect Swap (Todo)
 -- + Auto Garuda Rebound
--- + GUI always on top (above game UI) + Lock button mid-screen
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -38,18 +37,17 @@ local C = {
 }
 
 -- ==========================================
--- SCREEN GUI — HIGHEST ZINDEX TO OVERLAY GAME UI
+-- SCREEN GUI
 -- ==========================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "KZM"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.ZIndex = 100                -- on top of everything
-screenGui.DisplayOrder = 100          -- extra layer
+screenGui.DisplayOrder = 999
 screenGui.Parent = LocalPlayer.PlayerGui
 
 -- ==========================================
--- TOGGLE BUTTON (always visible, on top)
+-- TOGGLE BUTTON (always visible)
 -- ==========================================
 local toggleWindowBtn = Instance.new("TextButton")
 toggleWindowBtn.Size = UDim2.new(0, 72, 0, 24)
@@ -60,7 +58,7 @@ toggleWindowBtn.TextColor3 = C.white
 toggleWindowBtn.Font = Enum.Font.GothamBold
 toggleWindowBtn.TextSize = 11
 toggleWindowBtn.BorderSizePixel = 0
-toggleWindowBtn.ZIndex = 100
+toggleWindowBtn.ZIndex = 999
 toggleWindowBtn.Parent = screenGui
 local twCorner = Instance.new("UICorner")
 twCorner.CornerRadius = UDim.new(0, 6)
@@ -71,7 +69,7 @@ twStroke.Thickness = 1.5
 twStroke.Parent = toggleWindowBtn
 
 -- ==========================================
--- MAIN WINDOW — slightly bigger (540 x 340) with ZIndex 100
+-- MAIN WINDOW — slightly bigger (540 x 340)
 -- ==========================================
 local WIN_W = 540
 local WIN_H = 340
@@ -84,7 +82,7 @@ window.BackgroundColor3 = C.bg
 window.BorderSizePixel = 0
 window.Active = true
 window.Visible = true
-window.ZIndex = 100
+window.ZIndex = 5  -- lower than lock-on button
 window.Parent = screenGui
 Instance.new("UICorner", window).CornerRadius = UDim.new(0, 10)
 
@@ -117,7 +115,6 @@ titleBar.Name = "TitleBar"
 titleBar.Size = UDim2.new(1, 0, 0, TITLE_H)
 titleBar.BackgroundColor3 = C.panel
 titleBar.BorderSizePixel = 0
-titleBar.ZIndex = 101
 titleBar.Parent = window
 Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
 
@@ -167,7 +164,6 @@ minBtn.TextColor3 = C.white
 minBtn.Font = Enum.Font.GothamBold
 minBtn.TextSize = 13
 minBtn.BorderSizePixel = 0
-minBtn.ZIndex = 102
 minBtn.Parent = titleBar
 Instance.new("UICorner", minBtn).CornerRadius = UDim.new(1, 0)
 
@@ -218,7 +214,6 @@ tabBar.Size = UDim2.new(1, 0, 0, TAB_H)
 tabBar.Position = UDim2.new(0, 0, 0, TITLE_H)
 tabBar.BackgroundColor3 = Color3.fromRGB(14, 5, 20)
 tabBar.BorderSizePixel = 0
-tabBar.ZIndex = 101
 tabBar.Parent = window
 
 local tabLayout = Instance.new("UIListLayout")
@@ -245,7 +240,6 @@ contentFrame.Size = UDim2.new(1, 0, 1, -HEADER_H)
 contentFrame.Position = UDim2.new(0, 0, 0, HEADER_H)
 contentFrame.BackgroundTransparency = 1
 contentFrame.ClipsDescendants = true
-contentFrame.ZIndex = 100
 contentFrame.Parent = window
 
 -- ==========================================
@@ -277,7 +271,6 @@ local function makeScrollList(parent)
     sf.ScrollBarImageColor3 = C.accent
     sf.ScrollingDirection = Enum.ScrollingDirection.Y
     sf.CanvasSize = UDim2.new(0, 0, 0, 0)
-    sf.ZIndex = 100
     sf.Parent = parent
 
     local layout = Instance.new("UIListLayout")
@@ -305,7 +298,6 @@ local function makeToggle(parent, labelText, default, callback)
     row.Size = UDim2.new(1, -4, 0, 28)
     row.BackgroundColor3 = C.row
     row.BorderSizePixel = 0
-    row.ZIndex = 100
     row.Parent = parent
     makeCorner(row, 6)
     makeStroke(row, C.stroke, 1, 0.6)
@@ -319,7 +311,6 @@ local function makeToggle(parent, labelText, default, callback)
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.ZIndex = 101
     lbl.Parent = row
 
     local toggleBG = Instance.new("Frame")
@@ -327,7 +318,6 @@ local function makeToggle(parent, labelText, default, callback)
     toggleBG.Position = UDim2.new(1, -42, 0.5, -9)
     toggleBG.BackgroundColor3 = default and C.toggleOn or C.toggleOff
     toggleBG.BorderSizePixel = 0
-    toggleBG.ZIndex = 101
     toggleBG.Parent = row
     makeCorner(toggleBG, 9)
 
@@ -336,7 +326,6 @@ local function makeToggle(parent, labelText, default, callback)
     knob.Position = default and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
     knob.BackgroundColor3 = C.white
     knob.BorderSizePixel = 0
-    knob.ZIndex = 102
     knob.Parent = toggleBG
     makeCorner(knob, 6)
 
@@ -344,7 +333,6 @@ local function makeToggle(parent, labelText, default, callback)
     btn.Size = UDim2.new(1, 0, 1, 0)
     btn.BackgroundTransparency = 1
     btn.Text = ""
-    btn.ZIndex = 101
     btn.Parent = row
 
     local isOn = default or false
@@ -382,7 +370,6 @@ local function makeButton(parent, labelText, callback)
     row.TextColor3 = C.white
     row.Font = Enum.Font.GothamBold
     row.TextSize = 11
-    row.ZIndex = 100
     row.Parent = parent
     makeCorner(row, 6)
     makeStroke(row, C.stroke, 1, 0.4)
@@ -410,7 +397,6 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     row.Size = UDim2.new(1, -4, 0, 42)
     row.BackgroundColor3 = C.row
     row.BorderSizePixel = 0
-    row.ZIndex = 100
     row.Parent = parent
     makeCorner(row, 6)
     makeStroke(row, C.stroke, 1, 0.6)
@@ -424,7 +410,6 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.ZIndex = 101
     lbl.Parent = row
 
     local valLbl = Instance.new("TextLabel")
@@ -436,7 +421,6 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     valLbl.Font = Enum.Font.GothamBold
     valLbl.TextSize = 11
     valLbl.TextXAlignment = Enum.TextXAlignment.Right
-    valLbl.ZIndex = 101
     valLbl.Parent = row
 
     local track = Instance.new("Frame")
@@ -444,7 +428,6 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     track.Position = UDim2.new(0, 8, 0, 27)
     track.BackgroundColor3 = C.toggleOff
     track.BorderSizePixel = 0
-    track.ZIndex = 100
     track.Parent = row
     makeCorner(track, 3)
 
@@ -452,7 +435,6 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
     fill.BackgroundColor3 = C.accent
     fill.BorderSizePixel = 0
-    fill.ZIndex = 101
     fill.Parent = track
     makeCorner(fill, 3)
 
@@ -470,7 +452,7 @@ local function makeSlider(parent, labelText, min, max, default, callback)
     knob.Position = UDim2.new((default - min) / (max - min), 0, 0.5, 0)
     knob.BackgroundColor3 = C.white
     knob.BorderSizePixel = 0
-    knob.ZIndex = 102
+    knob.ZIndex = 2
     knob.Parent = track
     makeCorner(knob, 6)
 
@@ -514,7 +496,6 @@ local function makeSectionRow(parent, text)
     f.Size = UDim2.new(1, -4, 0, 20)
     f.BackgroundColor3 = Color3.fromRGB(30, 8, 45)
     f.BorderSizePixel = 0
-    f.ZIndex = 100
     f.Parent = parent
     makeCorner(f, 5)
 
@@ -533,7 +514,6 @@ local function makeSectionRow(parent, text)
     lbl.TextColor3 = Color3.fromRGB(255, 160, 180)
     lbl.Font = Enum.Font.GothamBold
     lbl.TextSize = 10
-    lbl.ZIndex = 101
     lbl.Parent = f
 
     return f
@@ -548,7 +528,6 @@ local function makeDropdown(parent, labelText, items, default, callback)
     row.BackgroundColor3 = C.row
     row.BorderSizePixel = 0
     row.ClipsDescendants = false
-    row.ZIndex = 100
     row.Parent = parent
     makeCorner(row, 6)
     makeStroke(row, C.stroke, 1, 0.6)
@@ -562,7 +541,6 @@ local function makeDropdown(parent, labelText, items, default, callback)
     lbl.Font = Enum.Font.GothamMedium
     lbl.TextSize = 11
     lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.ZIndex = 101
     lbl.Parent = row
 
     local selectedLbl = Instance.new("TextLabel")
@@ -574,7 +552,6 @@ local function makeDropdown(parent, labelText, items, default, callback)
     selectedLbl.Font = Enum.Font.GothamBold
     selectedLbl.TextSize = 10
     selectedLbl.TextXAlignment = Enum.TextXAlignment.Right
-    selectedLbl.ZIndex = 101
     selectedLbl.Parent = row
 
     local listFrame = Instance.new("Frame")
@@ -584,7 +561,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
     listFrame.BorderSizePixel = 0
     listFrame.ClipsDescendants = true
     listFrame.Visible = false
-    listFrame.ZIndex = 102
+    listFrame.ZIndex = 5
     listFrame.Parent = row
     makeCorner(listFrame, 5)
 
@@ -595,7 +572,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
     listScroller.CanvasSize = UDim2.new(0, 0, 0, 0)
     listScroller.ScrollBarThickness = 3
     listScroller.ScrollBarImageColor3 = C.accent
-    listScroller.ZIndex = 102
+    listScroller.ZIndex = 5
     listScroller.Parent = listFrame
 
     local listLayout = Instance.new("UIListLayout")
@@ -608,7 +585,6 @@ local function makeDropdown(parent, labelText, items, default, callback)
     btn.Position = UDim2.new(0, 0, 0, 0)
     btn.BackgroundTransparency = 1
     btn.Text = ""
-    btn.ZIndex = 101
     btn.Parent = row
 
     local selectedItem = default
@@ -639,7 +615,7 @@ local function makeDropdown(parent, labelText, items, default, callback)
             itemBtn.TextColor3 = C.text
             itemBtn.Font = Enum.Font.Gotham
             itemBtn.TextSize = 10
-            itemBtn.ZIndex = 103
+            itemBtn.ZIndex = 6
             itemBtn.Parent = listScroller
             makeCorner(itemBtn, 4)
             if itemName == selectedItem then selectedExists = true end
@@ -702,7 +678,6 @@ for _, name in ipairs(tabNames) do
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 9
     btn.BorderSizePixel = 0
-    btn.ZIndex = 101
     btn.Parent = tabBar
     makeCorner(btn, 5)
 
@@ -710,7 +685,6 @@ for _, name in ipairs(tabNames) do
     tabFrame.Size = UDim2.new(1, 0, 1, 0)
     tabFrame.BackgroundTransparency = 1
     tabFrame.Visible = false
-    tabFrame.ZIndex = 100
     tabFrame.Parent = contentFrame
 
     tabFrames[name] = tabFrame
@@ -823,17 +797,17 @@ local lockOnActive = false
 local lockedTarget = nil
 local lockMethod = {}
 
--- Lock button (floating) – now at mid-screen with ZIndex 101
+-- Lock button (floating) – now ZIndex = 10 and positioned higher
 local lockOnBtn = Instance.new("ImageButton")
 lockOnBtn.Name = "LockOnBtn"
 lockOnBtn.Size = UDim2.new(0, 70, 0, 70)
-lockOnBtn.Position = UDim2.new(0.5, -35, 0.45, 0)  -- mid-screen
+lockOnBtn.Position = UDim2.new(1, -120, 1, -280)  -- above star button bottom right
 lockOnBtn.BackgroundTransparency = 1
 lockOnBtn.Image = "rbxassetid://11738355467"
 lockOnBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
 lockOnBtn.ImageTransparency = 0.1
 lockOnBtn.Visible = false
-lockOnBtn.ZIndex = 101  -- above main window
+lockOnBtn.ZIndex = 10  -- always on top
 lockOnBtn.Parent = screenGui
 
 local loDragging, loDragStart, loStartPos
@@ -1323,7 +1297,6 @@ statusRowTp.Name = "StatusRow"
 statusRowTp.Size = UDim2.new(1, -4, 0, 20)
 statusRowTp.BackgroundColor3 = C.row
 statusRowTp.BorderSizePixel = 0
-statusRowTp.ZIndex = 100
 statusRowTp.Parent = teleportS
 makeCorner(statusRowTp, 5)
 makeStroke(statusRowTp, C.stroke, 1, 0.5)
@@ -1336,7 +1309,6 @@ statusLblTp.TextColor3 = C.textDim
 statusLblTp.Font = Enum.Font.Gotham
 statusLblTp.TextSize = 10
 statusLblTp.TextXAlignment = Enum.TextXAlignment.Center
-statusLblTp.ZIndex = 101
 statusLblTp.Parent = statusRowTp
 
 -- ==========================================
@@ -1834,7 +1806,6 @@ local statusRowExtra = Instance.new("Frame")
 statusRowExtra.Size = UDim2.new(1, -4, 0, 20)
 statusRowExtra.BackgroundColor3 = C.row
 statusRowExtra.BorderSizePixel = 0
-statusRowExtra.ZIndex = 100
 statusRowExtra.Parent = extraS
 makeCorner(statusRowExtra, 5)
 makeStroke(statusRowExtra, C.stroke, 1, 0.5)
@@ -1847,7 +1818,6 @@ statusLblExtra.TextColor3 = C.textDim
 statusLblExtra.Font = Enum.Font.Gotham
 statusLblExtra.TextSize = 10
 statusLblExtra.TextXAlignment = Enum.TextXAlignment.Center
-statusLblExtra.ZIndex = 101
 statusLblExtra.Parent = statusRowExtra
 
 makeButton(extraS, "⬆ Pick Up Selected Item", function()
@@ -1952,20 +1922,12 @@ local credLbl = Instance.new("TextLabel")
 credLbl.Size = UDim2.new(1, -4, 0, 36)
 credLbl.BackgroundColor3 = C.row
 credLbl.BorderSizePixel = 0
-credLbl.ZIndex = 100
+credLbl.Text = "｢KZM」 • Made for JJS\nBuilt by KZM"
+credLbl.TextColor3 = C.textDim
+credLbl.Font = Enum.Font.Gotham
+credLbl.TextSize = 10
 credLbl.Parent = configS
 makeCorner(credLbl, 6)
-
-local credText = Instance.new("TextLabel")
-credText.Size = UDim2.new(1, 0, 1, 0)
-credText.BackgroundTransparency = 1
-credText.Text = "｢KZM」 • Made for JJS\nBuilt by KZM"
-credText.TextColor3 = C.textDim
-credText.Font = Enum.Font.Gotham
-credText.TextSize = 10
-credText.TextXAlignment = Enum.TextXAlignment.Center
-credText.ZIndex = 101
-credText.Parent = credLbl
 
 -- ==========================================
 -- RESET ON RESPAWN (clean up TP features)
@@ -1987,4 +1949,4 @@ end)
 -- ==========================================
 switchTab("Main")
 
-print("✅ ｢KZM」 v1.3 with all fixes loaded (Auto Ratio fixed, Perfect Swap, Walk into Domains, Auto Garuda Rebound, GUI on top, lock mid-screen)")
+print("✅ ｢KZM」 v1.3 with all fixes loaded (Auto Ratio fixed, Perfect Swap, Walk into Domains, Auto Garuda Rebound)")5,{v[438749-438748],v[428325+-428323],v[-330239-(-330242)],v[931222+-931218];v[114052-114047],v[858747+-858741]})F=k X=J(-123578+91835)k=p[v[540230-540223]]Z=p[v[358592+-358591]]s=p[v[9065+-9063]]f=s(X,n)R=Z[f]Z=true n=J(-854565+822755)X=Q[n]K=p[v[837498-837497]]I=p[v[-905567+905569]]L=I(m,S)m=11210699090751-841435 n=K[L]f=X[n]L=J(418447+-450225)n=p[v[-989339-(-989340)]]K=p[v[-414250+414252]]M=J(-555561-(-523584))I=K(L,m)X=n[I]s=f[X]M=k[M]X=J(-899956-(-868162))M=M(k,R,F,Z,s)k=p[v[-1007439+1007446]]Z=p[v[584319+-584318]]s=p[v[550033-550031]]n=364732+11936538330362 f=s(X,n)S=-429537+15050886342977 R=Z[f]Z=true n=J(971669+-1003479)m=J(-115098-(-83363))X=Q[n]M=J(101827+-133804)K=p[v[-545097-(-545098)]]I=p[v[805964-805962]]L=I(m,S)n=K[L]f=X[n]n=p[v[-553776+553777]]m=-790484+30167768467123 L=J(-899+-30956)K=p[v[744282-744280]]I=K(L,m)S=335476+15414023306645 m=J(1043881+-1075851)X=n[I]M=k[M]s=f[X]M=M(k,R,F,Z,s)k=p[v[1005077-1005070]]Z=p[v[-69380+69381]]s=p[v[-135957-(-135959)]]X=J(321790+-353759)n=-254727+33663209611330 f=s(X,n)R=Z[f]Z=true n=J(-179563+147753)X=Q[n]K=p[v[-68467+68468]]I=p[v[-112431-(-112433)]]L=I(m,S)n=K[L]f=X[n]n=p[v[1036382-1036381]]K=p[v[-627006-(-627008)]]M=J(169911-201888)L=J(155887-187642)m=-241219+3628474315996 I=K(L,m)X=n[I]n=10433926423946-660112 M=k[M]s=f[X]M=M(k,R,F,Z,s)M=J(-321178+289217)I=J(655110+-686937)X=J(695249+-727186)k=p[v[-1034095+1034102]]Z=p[v[82893-82892]]L=-186986+2111939124801 s=p[v[-782112+782114]]f=s(X,n)K=-955193+13027774507755 R=Z[f]s=p[v[416796-416795]]f=p[v[-187948-(-187950)]]n=J(-1009581-(-977659))X=f(n,K)Z=s[X]M=k[M]n=826483+32967863574404 M=M(k,R,Z)k=p[v[-409141+409148]]X=J(-373647+341928)K=642091993200-(-112826)M=J(-356772-(-324811))Z=p[v[729463+-729462]]s=p[v[-681622+681624]]f=s(X,n)R=Z[f]s=p[v[-974532+974533]]n=J(-233218+201310)f=p[v[158533-158531]]X=f(n,K)Z=s[X]M=k[M]n=23396221105022-35056 M=M(k,R,Z)k=p[v[-868077-(-868084)]]X=J(917749+-949619)Z=p[v[362318+-362317]]s=p[v[-42636+42638]]K=24688270622977-889881 f=s(X,n)n=J(-117436+85482)M=J(362183+-394144)R=Z[f]s=p[v[-771625-(-771626)]]f=p[v[134182-134180]]X=f(n,K)M=k[M]Z=s[X]M=M(k,R,Z)X=J(805665+-837376)k=p[v[-519591+519598]]Z=p[v[360327+-360326]]s=p[v[-846627+846629]]n=33848145519432-(-121417)f=s(X,n)R=Z[f]f=J(-798991-(-767035))s=Q[f]X=p[v[-529547-(-529548)]]n=p[v[429686+-429684]]K=n(I,L)f=X[K]n=787452-787451 Z=s[f]M=J(-756904+725059)K=-81233-(-81153)M=k[M]f=862705-862704 L=-53652+34937251926304 X=786583-786923 s={Z(f,X,n,K)}X=J(747066+-778794)M=M(k,R,e(s))k=p[v[425880-425873]]n=14132653701454-171929 Z=p[v[916721-916720]]s=p[v[453280+-453278]]I=J(523991-555917)f=s(X,n)R=Z[f]f=J(-190308+158352)M=J(988328-1020173)s=Q[f]X=p[v[687218-687217]]n=p[v[-694688-(-694690)]]K=n(I,L)F=nil n=-784377+784378 f=X[K]K=-283044-(-282964)Z=s[f]I=J(-943828+912128)X=370217+-370497 M=k[M]f=208469-208468 s={Z(f,X,n,K)}L=-997826+8314075957473 M=M(k,R,e(s))X=J(-913110+881287)k=p[v[855668-855661]]M=J(454168-486013)Z=p[v[226588-226587]]n=-657819+11453969227376 s=p[v[408884-408882]]f=s(X,n)R=Z[f]f=J(142217-174173)s=Q[f]X=p[v[-661191-(-661192)]]n=p[v[101083-101081]]K=n(I,L)f=X[K]X=-527790+527570 Z=s[f]f=-282677+282678 n=-950528+950529 K=-603353-(-603273)M=k[M]s={Z(f,X,n,K)}M=M(k,R,e(s))k=Q[J(256373-288261)]M={}end else if k<16283218-(-257319)then k=p[v[316469+-316459]]R=p[v[-793246-(-793257)]]F[k]=R k=p[v[-770550+770562]]R={k(F)}k=Q[J(783729-815636)]M={e(R)}else X=nil k=16958262-1021132 s=nil n=nil end end end else if k<17438905-803073 then if k<16027723-(-573691)then if k<-835661+17430178 then k=M and 610671+4476440 or-550114+944853 else F=p[v[948032+-948026]]Z=p[v[604317-604310]]X=J(-852329-(-820603))n=7013058745396-(-424077)k=-779075+9751012 s=p[v[-412299+412307]]f=s(X,n)R=Z[f]Z=false F[R]=Z end else if k<17180879-551465 then k=s M=Z k=-714050+3176914 else u=-607951-(-607951)r=#T H=r==u k=7082581-(-117428)end end else if k<-216004+16935597 then if k<16357348-(-314676)then R=k F=M k=F and 5721699-750836 or 14201796-752892 M=F else M={}k=Q[J(290668-322399)]end else if k<-110185+16871008 then F=l[552956+-552955]M=F R=l[132241-132239]Z=k k=F and-143082-(-709242)or 976586+694501 else k=false n=J(-1021576-(-989725))p[v[-716643+716644]]=k s=p[v[159609+-159607]]f=p[v[-245489+245492]]K=241813+26885091885138 X=f(n,K)I=353234+31006302393492 Z=s[X]M=F[Z]L=23209031778514-(-272741)K=J(920163+-952110)p[v[-739090-(-739094)]]=M f=p[v[568074-568072]]X=p[v[780709+-780706]]n=X(K,I)s=f[n]Z=F[s]I=J(678165+-710048)p[v[-75660+75665]]=Z X=p[v[-76622+76624]]n=p[v[550054-550051]]K=n(I,L)f=X[K]s=F[f]M={s}k=Q[J(-730732-(-698761))]end end end end end end end end end k=#w return e(M)end,function(Q,J)local e=Z(J)local l=function(l,v,w)return k(Q,{l,v;w},J,e)end return l end,{},function(Q,J)local e=Z(J)local l=function(l,v,w,D,M,p,F,G)return k(Q,{l;v,w;D;M,p;F,G},J,e)end return l end,function(Q)F[Q]=F[Q]-(-168955+168956)if-91943+91943==F[Q]then F[Q],p[Q]=nil,nil end end return(f(10438033-(-985984),{}))(e(M))end)(getfenv and getfenv()or _ENV,unpack or table[J(201637+-233408)],newproxy,setmetatable,getmetatable,select,{...})end)(...)
