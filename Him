@@ -4,6 +4,9 @@
 -- + Correct M1 Assist (Uppercut / Downslam) + Auto Burst
 -- + Emote Unlocker (replaces Extra Emote Slots toggle)
 -- + Integrated Teleport Tools (Bypass, Selected, All Loop)
+-- + Walk into Domains (Extra)
+-- + Auto Ratio (Nanami) – FIXED
+-- + Perfect Swap (Todo)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -1305,7 +1308,7 @@ statusLblTp.TextXAlignment = Enum.TextXAlignment.Center
 statusLblTp.Parent = statusRowTp
 
 -- ==========================================
--- AUTO TAB (Correct M1 Assist + Auto Burst)
+-- AUTO TAB (Correct M1 Assist + Auto Burst + Auto Ratio + Perfect Swap)
 -- ==========================================
 local autoS = scrolls["Auto"]
 
@@ -1465,7 +1468,135 @@ makeToggle(autoS, "Auto Burst", false, function(state)
 end)
 
 -- ==========================================
--- EXTRA TAB (FIXED ITEM GRABBER + EMOTE UNLOCKER)
+-- AUTO RATIO (Nanami) – FIXED with exact deobfuscated code
+-- ==========================================
+makeSectionRow(autoS, "Nanami")
+
+local autoRatioConn = nil
+local autoRatioTable = {}
+
+makeToggle(autoS, "Auto Ratio", false, function(state)
+    if state then
+        if autoRatioConn then autoRatioConn:Disconnect(); autoRatioConn = nil end
+        local nanamiService = game.ReplicatedStorage.Knit.Knit.Services:FindFirstChild("NanamiService")
+        if nanamiService and nanamiService.RE and nanamiService.RE.Effects then
+            autoRatioConn = nanamiService.RE.Effects.OnClientEvent:Connect(function(...)
+                local args = {...}
+                if args[1] == "SpawnRatio" and args[2] == LocalPlayer then
+                    local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+                    local delay = args[6] * math.clamp(0.56 - (math.floor(ping) - 100) / 1000 * 0.9, 0.25, 0.85)
+                    task.wait(delay)
+                    if nanamiService and nanamiService.RE and nanamiService.RE.RightActivated then
+                        pcall(function()
+                            nanamiService.RE.RightActivated:FireServer()
+                        end)
+                    end
+                end
+            end)
+            autoRatioTable.AutoRatio1 = autoRatioConn
+        else
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Auto Ratio",
+                Text = "NanamiService not found!",
+                Duration = 2
+            })
+        end
+    else
+        if autoRatioConn then
+            autoRatioConn:Disconnect()
+            autoRatioConn = nil
+            autoRatioTable.AutoRatio1 = nil
+        end
+    end
+end)
+
+-- ==========================================
+-- PERFECT SWAP (Todo)
+-- ==========================================
+makeSectionRow(autoS, "Todo")
+
+local perfectSwapActive = false
+local perfectSwapConn = nil
+local perfectSwapCharConn = nil
+local perfectSwapEventConn = nil
+local perfectSwapConnections = {}
+
+local function setupPerfectSwap(char)
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    local animator = hum:FindFirstChildOfClass("Animator")
+    if not animator then return end
+
+    local animConn = animator.AnimationPlayed:Connect(function(track)
+        if not perfectSwapActive then return end
+        if track.Animation then
+            local id = track.Animation.AnimationId
+            if id == "rbxassetid://91074768993486" or
+               id == "rbxassetid://131358603583212" or
+               id == "rbxassetid://116040503139675" then
+                if not perfectSwapEventConn then
+                    local todoService = RS.Knit.Knit.Services:FindFirstChild("TodoService")
+                    if todoService and todoService.RE and todoService.RE.Effects then
+                        perfectSwapEventConn = todoService.RE.Effects.OnClientEvent:Connect(function(...)
+                            if not perfectSwapActive then return end
+                            local args = {...}
+                            if args[1] == "Swap" or args[1] == "Swap2" or args[1] == "Fakeout" then
+                                local todoSvc = RS.Knit.Knit.Services:FindFirstChild("TodoService")
+                                if todoSvc and todoSvc.RE and todoSvc.RE.Activated then
+                                    pcall(function()
+                                        todoSvc.RE.Activated:FireServer(false)
+                                    end)
+                                    if perfectSwapEventConn then
+                                        perfectSwapEventConn:Disconnect()
+                                        perfectSwapEventConn = nil
+                                    end
+                                end
+                            end
+                        end)
+                        table.insert(perfectSwapConnections, perfectSwapEventConn)
+                    end
+                end
+            end
+        end
+    end)
+    table.insert(perfectSwapConnections, animConn)
+end
+
+makeToggle(autoS, "Perfect Swap", false, function(state)
+    if state then
+        if perfectSwapActive then return end
+        perfectSwapActive = true
+        perfectSwapConnections = {}
+        perfectSwapEventConn = nil
+
+        local char = LocalPlayer.Character
+        if char then
+            setupPerfectSwap(char)
+        end
+
+        perfectSwapCharConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+            if perfectSwapActive then
+                setupPerfectSwap(newChar)
+            end
+        end)
+        table.insert(perfectSwapConnections, perfectSwapCharConn)
+
+        print("✅ Perfect Swap enabled")
+    else
+        perfectSwapActive = false
+        for _, conn in ipairs(perfectSwapConnections) do
+            pcall(conn.Disconnect, conn)
+        end
+        table.clear(perfectSwapConnections)
+        perfectSwapEventConn = nil
+        perfectSwapCharConn = nil
+        print("✅ Perfect Swap disabled")
+    end
+end)
+
+-- ==========================================
+-- EXTRA TAB (FIXED ITEM GRABBER + EMOTE UNLOCKER + Walk into Domains)
 -- ==========================================
 local extraS = scrolls["Extra"]
 
@@ -1676,6 +1807,27 @@ makeButton(extraS, "⬆ Pick Up Selected Item", function()
     end
 end)
 
+-- ==========================================
+-- Walk into Domains
+-- ==========================================
+makeSectionRow(extraS, "Domain")
+
+makeToggle(extraS, "Walk into Domains", false, function(state)
+    if state then
+        RunService:BindToRenderStep("Walk-Domain", 0, function()
+            local domains = workspace:FindFirstChild("Domains")
+            if domains then
+                local domain = domains:FindFirstChild("Domain")
+                if domain and domain:IsA("BasePart") then
+                    domain.CanCollide = false
+                end
+            end
+        end)
+    else
+        RunService:UnbindFromRenderStep("Walk-Domain")
+    end
+end)
+
 makeSectionRow(extraS, "Misc")
 
 makeToggle(extraS, "Anti AFK", false, function(state)
@@ -1749,4 +1901,4 @@ end)
 -- ==========================================
 switchTab("Main")
 
-print("✅ ｢KZM」 v1.3 with FAST Teleport Tools (Bypass, Selected, All Loop) loaded")
+print("✅ ｢KZM」 v1.3 with all fixes loaded (Auto Ratio fixed, Perfect Swap, Walk into Domains)")
