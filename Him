@@ -7,6 +7,7 @@
 -- + Walk into Domains (Extra)
 -- + Auto Ratio (Nanami) – FIXED
 -- + Perfect Swap (Todo)
+-- + Auto Garuda Rebound
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -66,11 +67,10 @@ twStroke.Thickness = 1.5
 twStroke.Parent = toggleWindowBtn
 
 -- ==========================================
--- MAIN WINDOW — wide & short (landscape)
--- W: 500  H: 300
+-- MAIN WINDOW — slightly bigger (540 x 340)
 -- ==========================================
-local WIN_W = 500
-local WIN_H = 300
+local WIN_W = 540
+local WIN_H = 340
 
 local window = Instance.new("Frame")
 window.Name = "Window"
@@ -80,6 +80,7 @@ window.BackgroundColor3 = C.bg
 window.BorderSizePixel = 0
 window.Active = true
 window.Visible = true
+window.ZIndex = 5  -- lower than lock-on button
 window.Parent = screenGui
 Instance.new("UICorner", window).CornerRadius = UDim.new(0, 10)
 
@@ -794,16 +795,17 @@ local lockOnActive = false
 local lockedTarget = nil
 local lockMethod = {}
 
--- Lock button (floating)
+-- Lock button (floating) – now ZIndex = 10 and positioned higher
 local lockOnBtn = Instance.new("ImageButton")
 lockOnBtn.Name = "LockOnBtn"
 lockOnBtn.Size = UDim2.new(0, 70, 0, 70)
-lockOnBtn.Position = UDim2.new(0.5, -35, 0.8, 0)
+lockOnBtn.Position = UDim2.new(0.5, -35, 0.72, 0)  -- moved up (above stat bar)
 lockOnBtn.BackgroundTransparency = 1
 lockOnBtn.Image = "rbxassetid://11738355467"
 lockOnBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
 lockOnBtn.ImageTransparency = 0.1
 lockOnBtn.Visible = false
+lockOnBtn.ZIndex = 10  -- always on top
 lockOnBtn.Parent = screenGui
 
 local loDragging, loDragStart, loStartPos
@@ -1308,7 +1310,7 @@ statusLblTp.TextXAlignment = Enum.TextXAlignment.Center
 statusLblTp.Parent = statusRowTp
 
 -- ==========================================
--- AUTO TAB (Correct M1 Assist + Auto Burst + Auto Ratio + Perfect Swap)
+-- AUTO TAB (Correct M1 Assist + Auto Burst + Auto Ratio + Perfect Swap + Auto Garuda Rebound)
 -- ==========================================
 local autoS = scrolls["Auto"]
 
@@ -1592,6 +1594,50 @@ makeToggle(autoS, "Perfect Swap", false, function(state)
         perfectSwapEventConn = nil
         perfectSwapCharConn = nil
         print("✅ Perfect Swap disabled")
+    end
+end)
+
+-- ==========================================
+-- AUTO GARUDA REBOUND
+-- ==========================================
+makeSectionRow(autoS, "Garuda")
+
+local autoGarudaConn = nil
+local autoGarudaTable = {}
+
+makeToggle(autoS, "Auto Garuda Rebound", false, function(state)
+    if state then
+        if autoGarudaConn then autoGarudaConn:Disconnect(); autoGarudaConn = nil end
+        local garudaService = game.ReplicatedStorage.Knit.Knit.Services:FindFirstChild("GarudaReboundService")
+        if garudaService and garudaService.RE and garudaService.RE.Effects then
+            autoGarudaConn = garudaService.RE.Effects.OnClientEvent:Connect(function(...)
+                local args = {...}
+                if args[1] == "Recall" and args[2] == LocalPlayer.Character then
+                    if args[5] == 0.1 then return end
+                    local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+                    local delay = math.max(args[5] - math.clamp(0.1 + math.floor(ping) / 1000 * 0.6, 0.12, 0.35), 0)
+                    task.wait(delay)
+                    if garudaService and garudaService.RE and garudaService.RE.Activated then
+                        pcall(function()
+                            garudaService.RE.Activated:FireServer(LocalPlayer.Character.Moveset:FindFirstChild("Garuda Rebound"))
+                        end)
+                    end
+                end
+            end)
+            autoGarudaTable.AutoGarudaRebound = autoGarudaConn
+        else
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "Auto Garuda Rebound",
+                Text = "GarudaReboundService not found!",
+                Duration = 2
+            })
+        end
+    else
+        if autoGarudaConn then
+            autoGarudaConn:Disconnect()
+            autoGarudaConn = nil
+            autoGarudaTable.AutoGarudaRebound = nil
+        end
     end
 end)
 
@@ -1901,4 +1947,4 @@ end)
 -- ==========================================
 switchTab("Main")
 
-print("✅ ｢KZM」 v1.3 with all fixes loaded (Auto Ratio fixed, Perfect Swap, Walk into Domains)")
+print("✅ ｢KZM」 v1.3 with all fixes loaded (Auto Ratio fixed, Perfect Swap, Walk into Domains, Auto Garuda Rebound)")
